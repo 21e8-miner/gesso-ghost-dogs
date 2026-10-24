@@ -2109,6 +2109,41 @@ const DOG_DEFS = [
 ];
 let G = null, STEED = null;
 const P = { x: PLAYER_START.x, z: PLAYER_START.z, y: 0, vx: 0, vz: 0, head: Math.PI, speed: 0, phase: 0, reach: 0, reachT: 0, idle: 0, inWater: false };
+// ---- the air: a GPU field of motes wrapped around the camera (no CPU per particle). By day, dust that lights up toward the sun
+// (forward scattering, as in a sunbeam); at night a quarter of them become mint fireflies, drifting and pulsing.
+const AIRU = { uTime: U.time, uCam: { value: new T.Vector3() }, uSun: { value: new T.Vector3(0, 1, 0) }, uSunC: { value: new T.Color(1, 0.9, 0.7) }, uNight: { value: 0 }, uScale: { value: 600 }, uK: { value: 1 } };
+function buildAir() {
+  const N = 2800, r = mulberry32(404), pos = new Float32Array(N * 3), sd = new Float32Array(N * 4);
+  for (let i = 0; i < N; i++) {
+    pos[i * 3] = (r() - 0.5) * 70; pos[i * 3 + 1] = (r() - 0.5) * 22; pos[i * 3 + 2] = (r() - 0.5) * 70;
+    sd[i * 4] = 0.5 + r(); sd[i * 4 + 1] = r(); sd[i * 4 + 2] = r() < 0.25 ? 1 : 0; sd[i * 4 + 3] = 0.4 + r() * 0.8;
+  }
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('aS', new T.BufferAttribute(sd, 4));
+  const m = new T.ShaderMaterial({ uniforms: AIRU, transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false,
+    vertexShader: `
+      attribute vec4 aS; uniform float uTime, uNight, uScale, uK; uniform vec3 uCam, uSun, uSunC; varying vec3 vC; varying float vA;
+      void main(){
+        vec3 box = vec3(70.0, 22.0, 70.0);
+        float sp = aS.w, ph = aS.y * 6.2832;
+        vec3 p = position + vec3(0.9, 0.05, 0.5) * uTime * sp
+          + vec3(sin(uTime * 0.31 * sp + ph) * 0.7, sin(uTime * 0.47 + ph * 2.0) * 0.45, cos(uTime * 0.27 * sp + ph * 0.8) * 0.7);
+        p = uCam + mod(p - uCam + box * 0.5, box) - box * 0.5;        // the field wraps around the camera forever
+        vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_Position = projectionMatrix * mv;
+        float d = -mv.z, fire = aS.z * smoothstep(0.3, 0.8, uNight);
+        float fade = smoothstep(0.8, 2.5, d) * (1.0 - smoothstep(18.0, 34.0, d));
+        float fs = pow(max(dot(normalize(p - uCam), uSun), 0.0), 7.0) * 3.5 + 0.18;   // forward scatter: motes glow toward the sun
+        vec3 dust = uSunC * fs * (1.0 - uNight) * (1.0 - aS.z * 0.5);
+        float pulse = pow(0.5 + 0.5 * sin(uTime * (1.6 + aS.x) + aS.y * 40.0), 3.0);
+        vec3 fly = vec3(0.55, 1.7, 1.15) * (0.25 + 2.2 * pulse);
+        vC = mix(dust, fly, fire); vA = fade * uK * mix(0.55, 1.0, fire);
+        gl_PointSize = clamp((fire > 0.5 ? 0.16 : 0.035) * aS.x * uScale / max(d, 0.1), 0.0, 22.0);
+      }`,
+    fragmentShader: `
+      varying vec3 vC; varying float vA;
+      void main(){ vec2 c = gl_PointCoord - 0.5; float a = exp(-dot(c, c) * 18.0) * vA; if (a < 0.003) discard; gl_FragColor = vec4(vC * a, a); }`,
+  });
+  const pts = new T.Points(g, m); pts.frustumCulled = false; pts.renderOrder = 5; return pts;
+}
 function buildActors() {
   G = buildGesso(); scene.add(G.root);
   G.light = new T.PointLight(new T.Color(0.85, 1, 0.92), 0, 9, 2); G.light.position.set(0, 2.6, 0.6); G.root.add(G.light);
@@ -2167,6 +2202,7 @@ function buildActors() {
   for (let i = 0; i < NM; i++) { mp[i * 3] = (Math.random() - 0.5) * 120; mp[i * 3 + 1] = Math.random() * 14; mp[i * 3 + 2] = (Math.random() - 0.5) * 120; ms[i] = 4 + Math.random() * 6; }
   mg.setAttribute('position', new T.BufferAttribute(mp, 3)); mg.setAttribute('acolor', new T.BufferAttribute(mc, 3)); mg.setAttribute('size', new T.BufferAttribute(ms, 1));
   W.motes = new T.Points(mg, W.sparkMat); W.motes.frustumCulled = false; scene.add(W.motes);
+  W.air = buildAir(); scene.add(W.air);
 }
 
 // ================================================================= state + save
@@ -2687,6 +2723,8 @@ function updateDogs(dt) {
     d.gait += dt * TAU * gaitFreq(d.model, d.spd);
     d.sit = lerp(d.sit, wantSit && d.spd < 0.4 ? 1 : 0, Math.min(1, dt * 4));
     { let la = Math.atan2(P.x - d.x, P.z - d.z) - d.head; la = Math.atan2(Math.sin(la), Math.cos(la)); d.look = lerp(d.look || 0, d.state === 'follow' && d.spd < 1.2 ? clamp(la, -0.9, 0.9) : 0, Math.min(1, dt * 3)); }
+    d.wispT = (d.wispT || 0) - dt;
+    if (d.spd > 0.6 && d.wispT <= 0 && d.joined) { d.wispT = 0.22 + Math.random() * 0.2; emit(d.x - Math.sin(d.head) * 0.35, d.y + 0.45 + Math.random() * 0.15, d.z - Math.cos(d.head) * 0.35, 1, { sp: 0.18, up: 0.35, life: 1.8, c: C(d.def.tint).lerp(C('#a9dcc7'), 0.5).multiplyScalar(1.4 + SKYV.night * 1.6), s: 0.32 }); }
     d.puffT -= dt; if (d.spd > 4 && d.puffT <= 0) { d.puffT = 0.08; emit(d.x - Math.sin(d.head) * 0.6, d.y + 0.6, d.z - Math.cos(d.head) * 0.6, 1, { sp: 0.6, up: 0.6, life: 0.9, c: C(d.def.tint).multiplyScalar(1.2), s: 0.5 }); }
   }
 }
@@ -2949,6 +2987,8 @@ function render(dt) {
   skyMat.uniforms.uSun.value.copy(_sunDir); skyMat.uniforms.uNight.value = sv.night; skyMat.uniforms.uCloud.value.copy(sv.hor).lerp(new T.Color(1, 1, 1), 0.45 * (1 - sv.night));
   scene.fog.color.copy(sv.hor).multiplyScalar(0.92); scene.fog.density = 0.0019 + sv.night * 0.0006;
   SANDU.uSandL.value.copy(_ld); SANDU.uSandC.value.copy(sun.color).multiplyScalar(sun.intensity * 0.6).lerp(_shC.setRGB(0.55, 0.75, 0.8), SKYV.night * 0.7); SANDU.uGlit.value = lerp(6, 9, SKYV.night);
+  AIRU.uCam.value.copy(camera.position); AIRU.uSun.value.copy(_sunDir); AIRU.uSunC.value.copy(sun.color).multiplyScalar(0.55 * clamp(_sunDir.y * 4 + 0.3, 0, 1)); AIRU.uNight.value = SKYV.night;
+  AIRU.uScale.value = VH * renderer.getPixelRatio() / (2 * Math.tan(camera.fov * DEG / 2)); AIRU.uK.value = quality === 'high' ? 1 : 0.6;
   FOGU.uFogSun.value.copy(_sunDir); FOGU.uFogSunCol.value.copy(sv.sun).multiplyScalar(0.9 * clamp(_sunDir.y * 4 + 0.4, 0, 1)).lerp(sv.hor, 0.35);
   fogPatchT -= dt; if (fogPatchT <= 0) { fogPatchT = 2; scene.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(fogPatch); }); }
   hemi.color.copy(sv.top).lerp(sv.hor, 0.5); hemi.groundColor.copy(C('#7a6444')).multiplyScalar(0.6 + 0.4 * (1 - sv.night)); hemi.intensity = sv.hemi;
