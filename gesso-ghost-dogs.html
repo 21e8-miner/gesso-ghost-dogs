@@ -1271,13 +1271,13 @@ function fanGeo(tint) {
 // pane material lit by the shared character light; m.userData.back is the BackSide twin sharing the same uniforms object
 function plateGhostMat(o = {}) {
   const uniforms = T.UniformsUtils.merge([T.UniformsLib.fog, { uColor: { value: new T.Color() }, uDeep: { value: new T.Color() }, uRim: { value: new T.Color() }, uAlpha: { value: 1 }, uAlphaMul: { value: 1 }, uTintMul: { value: new T.Color(1, 1, 1) }, uFan: { value: o.fan ? 1 : 0 } }]);
-  uniforms.uKeyV = PLU.uKeyV; uniforms.uSunC = PLU.uSunC; uniforms.uAmb = GHOSTU.uAmb; uniforms.uGlow = GHOSTU.uGlow;
+  uniforms.uKeyV = PLU.uKeyV; uniforms.uSunC = PLU.uSunC; uniforms.uAmb = GHOSTU.uAmb; uniforms.uGlow = GHOSTU.uGlow; uniforms.uTime = U.time;
   const vertexShader = `
       attribute float aEdge; attribute vec2 aLoc; attribute vec3 aTint; attribute float aInk; attribute float aOp;
-      varying float vEdge; varying vec2 vLoc; varying vec3 vTint; varying float vInk; varying float vOp; varying vec3 vN; varying vec3 vV;
+      varying float vEdge; varying vec2 vLoc; varying vec3 vTint; varying float vInk; varying float vOp; varying vec3 vN; varying vec3 vV; varying vec3 vGW;
       #include <fog_pars_vertex>
       void main(){
-        vEdge = aEdge; vLoc = aLoc; vTint = aTint; vInk = aInk; vOp = aOp;
+        vEdge = aEdge; vLoc = aLoc; vTint = aTint; vInk = aInk; vOp = aOp; vGW = (modelMatrix * vec4(position, 1.0)).xyz;
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
         vN = normalize(normalMatrix * normal); vV = -mvPosition.xyz;
         gl_Position = projectionMatrix * mvPosition;
@@ -1285,9 +1285,13 @@ function plateGhostMat(o = {}) {
       }`;
   const fragmentShader = `
       uniform vec3 uDeep; uniform vec3 uRim; uniform vec3 uKeyV; uniform vec3 uSunC; uniform vec3 uAmb; uniform vec3 uTintMul;
-      uniform float uAlpha; uniform float uAlphaMul; uniform float uFan; uniform float uGlow;
-      varying float vEdge; varying vec2 vLoc; varying vec3 vTint; varying float vInk; varying float vOp; varying vec3 vN; varying vec3 vV;
+      uniform float uAlpha; uniform float uAlphaMul; uniform float uFan; uniform float uGlow; uniform float uTime;
+      varying float vEdge; varying vec2 vLoc; varying vec3 vTint; varying float vInk; varying float vOp; varying vec3 vN; varying vec3 vV; varying vec3 vGW;
       #include <fog_pars_fragment>
+      float gHash(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+      float gNoise(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(mix(gHash(i), gHash(i + vec3(1,0,0)), f.x), mix(gHash(i + vec3(0,1,0)), gHash(i + vec3(1,1,0)), f.x), f.y),
+                   mix(mix(gHash(i + vec3(0,0,1)), gHash(i + vec3(1,0,1)), f.x), mix(gHash(i + vec3(0,1,1)), gHash(i + vec3(1,1,1)), f.x), f.y), f.z); }
       void main(){
         vec3 n = normalize(vN); if (!gl_FrontFacing) n = -n;
         float fr = pow(1.0 - abs(dot(n, normalize(vV))), 2.0);
@@ -1304,7 +1308,15 @@ function plateGhostMat(o = {}) {
           col *= 1.0 - 0.05 * smoothstep(0.75, 1.0, sin((vLoc.x * 0.35 + vLoc.y) * 40.0)) * clamp(1.0 - fwidth(vLoc.y) * 30.0, 0.0, 1.0);
         }
         col += uRim * fr * 0.18;
-        gl_FragColor = vec4(col, uAlpha * uAlphaMul * vOp * (0.46 + 0.14 * e + 0.15 * fr) * (1.0 + uGlow * 0.5));
+        // the spirit inside: a slow current of light drifting up and back through the glass, brighter at night
+        vec3 gp = vGW * 2.2 + vec3(0.0, -uTime * 0.35, uTime * 0.22);
+        float flow = gNoise(gp) * 0.6 + gNoise(gp * 2.3 + 7.1) * 0.4;
+        float band = smoothstep(0.58, 0.82, flow) * (1.0 - smoothstep(0.82, 0.98, flow) * 0.5);
+        col += mix(vec3(0.5, 1.0, 0.82), vec3(1.0, 0.82, 0.62), gNoise(gp * 0.5)) * band * (0.1 + 0.32 * uGlow);
+        // thin-film shimmer on the rim, held to the painting's mint-peach range
+        vec3 irid = 0.5 + 0.5 * cos(6.2832 * (fr * 1.6 + flow * 0.6 + vec3(0.0, 0.33, 0.67)));
+        col += mix(irid, vec3(0.75, 0.95, 0.85), 0.45) * fr * fr * 0.16;
+        gl_FragColor = vec4(col, uAlpha * uAlphaMul * vOp * (0.46 + 0.14 * e + 0.15 * fr + band * 0.06) * (1.0 + uGlow * 0.5));
         #include <fog_fragment>
         #include <encodings_fragment>
       }`;
@@ -1466,7 +1478,7 @@ function buildDog(tint, o = {}) {
     ghost(legShell(0.27 * legK, r1, r2, seed * 13 + li, false), pmL, kn, shL);
     let pg = null;
     if (pawGeo) { pg = new T.Group(); pg.position.set(0, -0.27 * legK, 0.02); kn.add(pg); ghost(pawGeo, pmL, pg, shL); }
-    else if (!echo) { const paw = new T.Mesh(facetGeo(box1, 0.02, seed + li), gm); paw.scale.set(0.07, 0.03, 0.1); paw.position.set(0, -0.27 * legK, 0.02); paw.renderOrder = 2; kn.add(paw); }
+    else if (!echo) { const pp = new T.Group(); pp.position.set(0, -0.27 * legK + 0.004, 0.018); pp.scale.set(0.062, 0.034, 0.085); kn.add(pp); ghost(ghostAttrs(facetGeo(new T.SphereGeometry(0.5, 9, 6), 0.05, seed + li), tc.clone().lerp(C('#efe4cc'), 0.45), 1.0), pmL, pp, shL); }
     legs.push({ hip, kn, back, ph, gph, x: lx, paw: pg });
   });
   // tail: caudal vertebrae tapering away
@@ -1817,7 +1829,10 @@ function sandMat(map) {
         float h1 = sdHash(cell), h2 = sdHash(cell + 17.3), h3 = sdHash(cell + 41.7);
         vec3 G = normalize(vec3(h1 - 0.5, 0.9, h2 - 0.5));
         float rv = dot(reflect(-L, G), V);
-        float gl = step(0.55, h3) * smoothstep(0.984, 0.997, rv) * (1.0 - smoothstep(5.0, 20.0, sdD)) * up * sdSh;
+        // each glint is a small disc at a random spot in its cell, so the grains never line up into a grid
+        vec2 cf = fract(vSandW.xz * 70.0) - vec2(0.2 + 0.6 * h2, 0.2 + 0.6 * h1);
+        float disc = 1.0 - smoothstep(0.08, 0.22, length(cf));
+        float gl = step(0.55, h3) * disc * smoothstep(0.984, 0.997, rv) * (1.0 - smoothstep(5.0, 20.0, sdD)) * up * sdSh;
         reflectedLight.directSpecular += sdSpec * diffuseColor.rgb + uSandC * gl * uGlit;
       }`);
   };
