@@ -190,6 +190,38 @@ const MAXANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 const scene = new T.Scene();
 const camera = new T.PerspectiveCamera(55, 1, 0.1, 4200);
 scene.fog = new T.FogExp2(0xa9c3dd, 0.0017);
+// aerial perspective after the painting: haze pools in low ground and warms toward the sun. One fog chunk for every built-in
+// material; world position is rebuilt from view space so sprites and instances work too. FOGU reaches materials via fogPatch().
+const FOGU = { uFogSun: { value: new T.Vector3(0, 1, 0) }, uFogSunCol: { value: new T.Color(1, 0.9, 0.7) } };
+T.ShaderChunk.fog_pars_vertex = '#ifdef USE_FOG\n varying float fogDepth; varying vec3 vFogW;\n#endif';
+T.ShaderChunk.fog_vertex = '#ifdef USE_FOG\n fogDepth = - mvPosition.z; vFogW = cameraPosition + ( vec4( mvPosition.xyz, 0.0 ) * viewMatrix ).xyz;\n#endif';
+T.ShaderChunk.fog_pars_fragment = `#ifdef USE_FOG
+  uniform vec3 fogColor; varying float fogDepth; varying vec3 vFogW; uniform vec3 uFogSun; uniform vec3 uFogSunCol;
+  #ifdef FOG_EXP2
+    uniform float fogDensity;
+  #else
+    uniform float fogNear; uniform float fogFar;
+  #endif
+#endif`;
+T.ShaderChunk.fog_fragment = `#ifdef USE_FOG
+  #ifdef FOG_EXP2
+    float fogFactor = 1.0 - exp( - fogDensity * fogDensity * fogDepth * fogDepth );
+  #else
+    float fogFactor = smoothstep( fogNear, fogFar, fogDepth );
+  #endif
+  vec3 fogV = normalize( vFogW - cameraPosition );
+  float fogH = exp( - max( vFogW.y + 1.5, 0.0 ) * 0.07 );
+  fogFactor = clamp( fogFactor * ( 0.7 + 1.1 * fogH ), 0.0, 1.0 );
+  float fogS = pow( max( dot( fogV, uFogSun ), 0.0 ), 6.0 );
+  gl_FragColor.rgb = mix( gl_FragColor.rgb, mix( fogColor, uFogSunCol, fogS * 0.7 ), fogFactor );
+#endif`;
+function fogPatch(m) {
+  if (!m || !m.fog || m.isShaderMaterial || m.userData.fogP) return;
+  const prev = m.onBeforeCompile, key = (prev ? prev.toString() : '') + '|fogp';
+  m.onBeforeCompile = function (sh, r) { if (prev && prev !== T.Material.prototype.onBeforeCompile) prev.call(this, sh, r); sh.uniforms.uFogSun = FOGU.uFogSun; sh.uniforms.uFogSunCol = FOGU.uFogSunCol; };
+  m.customProgramCacheKey = () => key; m.userData.fogP = true; m.needsUpdate = true;
+}
+let fogPatchT = 0; const _shV = new T.Vector3(), _shC = new T.Color();
 const U = { time: { value: 0 } };
 
 function canvasTex(w, h, draw, o = {}) {
@@ -458,7 +490,25 @@ function skyState(clock) {
 }
 
 // ================================================================= post
-let composer = null, bloom = null, finalPass = null, bokeh = null, paintPass = null;
+let composer = null, bloom = null, finalPass = null, bokeh = null, paintPass = null, shaftPass = null;
+// light shafts: march from each pixel toward the sun's screen position gathering bright sky; spires and towers carve the rays
+const ShaftShader = {
+  uniforms: { tDiffuse: { value: null }, uSun: { value: new T.Vector2(0.5, 0.5) }, uK: { value: 0 }, uCol: { value: new T.Color(1, 0.85, 0.6) } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 uSun; uniform float uK; uniform vec3 uCol; varying vec2 vUv;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    void main(){
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      if (uK > 0.001) {
+        vec2 d = (uSun - vUv) * (0.85 / 36.0); vec2 p = vUv + d * hash(vUv * 917.0); float acc = 0.0, w = 1.0;
+        for (int i = 0; i < 36; i++) { p += d; vec3 s = texture2D(tDiffuse, clamp(p, 0.001, 0.999)).rgb; acc += max(dot(s, vec3(0.3, 0.55, 0.15)) - 1.0, 0.0) * w; w *= 0.955; }
+        float fall = 1.0 - smoothstep(0.0, 1.1, length((vUv - uSun) * vec2(1.6, 1.0)));
+        c += uCol * acc / 36.0 * uK * (0.35 + 0.65 * fall);
+      }
+      gl_FragColor = vec4(c, 1.0);
+    }`,
+};
 // painterly pass: a generalized Kuwahara (4 oriented quadrants, least-variance mean) turns the world into flat brushed planes;
 // the subject mask keeps Gesso and the ghosts airbrush-smooth, as in the painting
 const PaintShader = {
@@ -548,6 +598,7 @@ if (HAS_POST) {
     composer = new T.EffectComposer(renderer, rt);
     composer.addPass(new T.RenderPass(scene, camera));
     if (T.BokehPass) { bokeh = new T.BokehPass(scene, camera, { focus: 4, aperture: 0.0009, maxblur: 0.0065, width: 4, height: 4 }); bokeh.enabled = false; bokeh.needsSwap = true; bokeh.setSize = function (w, h) { this.renderTargetDepth.setSize(w, h); }; composer.addPass(bokeh); }
+    shaftPass = new T.ShaderPass(ShaftShader); composer.addPass(shaftPass);
     bloom = new T.UnrealBloomPass(new T.Vector2(256, 256), 0.55, 0.55, 1.5); composer.addPass(bloom);
     paintPass = new T.ShaderPass(PaintShader); composer.addPass(paintPass);
     finalPass = new T.ShaderPass(FinalShader); composer.addPass(finalPass);
@@ -2756,7 +2807,9 @@ function render(dt) {
   const sv = SKYV;
   skyMat.uniforms.uTop.value.copy(sv.top); skyMat.uniforms.uHor.value.copy(sv.hor); skyMat.uniforms.uSunCol.value.copy(sv.sun);
   skyMat.uniforms.uSun.value.copy(_sunDir); skyMat.uniforms.uNight.value = sv.night; skyMat.uniforms.uCloud.value.copy(sv.hor).lerp(new T.Color(1, 1, 1), 0.45 * (1 - sv.night));
-  scene.fog.color.copy(sv.hor).multiplyScalar(0.92); scene.fog.density = 0.0015 + sv.night * 0.0006;
+  scene.fog.color.copy(sv.hor).multiplyScalar(0.92); scene.fog.density = 0.0019 + sv.night * 0.0006;
+  FOGU.uFogSun.value.copy(_sunDir); FOGU.uFogSunCol.value.copy(sv.sun).multiplyScalar(0.9 * clamp(_sunDir.y * 4 + 0.4, 0, 1)).lerp(sv.hor, 0.35);
+  fogPatchT -= dt; if (fogPatchT <= 0) { fogPatchT = 2; scene.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(fogPatch); }); }
   hemi.color.copy(sv.top).lerp(sv.hor, 0.5); hemi.groundColor.copy(C('#7a6444')).multiplyScalar(0.6 + 0.4 * (1 - sv.night)); hemi.intensity = sv.hemi;
   _ld.copy(_sunDir.y > 0.02 ? _sunDir : _moonL); if (_sunDir.y <= 0.02 && _sunDir.y > -0.1) _ld.lerpVectors(_moonL, _sunDir, clamp((_sunDir.y + 0.1) / 0.12, 0, 1)).normalize();
   sun.color.copy(sv.sun); sun.intensity = sv.sunI;
@@ -2850,6 +2903,13 @@ function render(dt) {
       if (bokeh.uniforms.farClip) bokeh.uniforms.farClip.value = camera.far; if (bokeh.uniforms.nearClip) bokeh.uniforms.nearClip.value = camera.near; } }
     const maskOn = !!(maskRT && MASK_R && quality !== 'light');
     fu.uMaskOn.value = maskOn ? 1 : 0; fu.uIso.value = maskOn ? isoK : 0; fu.uIsoB.value = maskOn ? isoBK : 0;
+    { // shafts are strongest with a low sun in front of the camera
+      _shV.copy(camera.position).addScaledVector(_sunDir, 1000).project(camera);
+      const front = _shV.z < 1 ? 1 - smooth(clamp((Math.max(Math.abs(_shV.x), Math.abs(_shV.y)) - 1.1) / 0.8, 0, 1)) : 0;
+      const low = smooth(clamp((_sunDir.y + 0.04) / 0.1, 0, 1)) * (0.35 + 0.65 * (1 - smooth(clamp((_sunDir.y - 0.15) / 0.45, 0, 1))));
+      const k = quality === 'high' && !hero ? front * low * 1.6 : 0; shaftPass.enabled = k > 0.01; shaftPass.uniforms.uK.value = k;
+      shaftPass.uniforms.uSun.value.set(_shV.x * 0.5 + 0.5, _shV.y * 0.5 + 0.5); shaftPass.uniforms.uCol.value.copy(sv.sun).lerp(_shC.setRGB(1, 0.8, 0.55), 0.4);
+    }
     paintPass.enabled = quality === 'high'; paintPass.uniforms.uMaskOn.value = maskOn ? 1 : 0; paintPass.uniforms.uK.value = hero ? 0.55 : 1;
     if (maskOn) {
       // one world-matrix update shared by the mask passes and the composer passes
