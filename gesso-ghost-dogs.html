@@ -2984,7 +2984,7 @@ function resize() {
   if (mapOpen) drawMap();
 }
 window.addEventListener('resize', resize);
-cv.addEventListener('webglcontextlost', e => { e.preventDefault(); try { save(); } catch (err) {} store.set('gesso-quality', 'light'); });
+cv.addEventListener('webglcontextlost', e => { e.preventDefault(); try { save(); } catch (err) {} store.set('gesso-quality', 'light'); try { toast('The graphics card reset. Reloading in light graphics.'); } catch (err) {} setTimeout(() => location.reload(), 1500); });
 cv.addEventListener('webglcontextrestored', () => location.reload());
 const _tgt = new T.Vector3(), _cam = new T.Vector3(), _look = new T.Vector3(0, 1, 10), _hp = new T.Vector3(), _v2c = new T.Color();
 const ECHO_DT = [0.085, 0.17, 0.255], STEED_DT = [0.055, 0.11, 0.165, 0.22];

@@ -1,7 +1,8 @@
 // headless shot list for the painting-match pass: title, day, dusk, night (frames go to out/ via the receiver on :8804)
 (async () => {
   const D = __dbg, tick = () => new Promise(r => setTimeout(r, 0));
-  const run = async (n, f) => { for (let i = 0; i < n; i++) { if (f) f(); D.step(0.033); if (i % 5 === 0) await tick(); } };
+  // grab frames in the same task as the last step: the drawing buffer is cleared once the browser composites
+  const run = async (n, f) => { for (let i = 0; i < n; i++) { if (f) f(); D.step(0.033); if (i % 5 === 0 && i < n - 1) await tick(); } if (f) f(); D.step(0.033); };
   for (const id of ['hud', 'tools']) { const e = document.getElementById(id); if (e) e.style.visibility = 'hidden'; }
   document.getElementById('title').style.visibility = 'hidden'; D.S.t = 0; await run(30); await D.shot('hl_title.jpg');
   document.getElementById('title').style.visibility = ''; document.getElementById('bStart').click();
