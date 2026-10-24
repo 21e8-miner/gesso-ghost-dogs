@@ -521,32 +521,92 @@ const ShaftShader = {
       gl_FragColor = vec4(c, 1.0);
     }`,
 };
-// painterly pass: a generalized Kuwahara (4 oriented quadrants, least-variance mean) turns the world into flat brushed planes;
-// the subject mask keeps Gesso and the ghosts airbrush-smooth, as in the painting
-const PaintShader = {
-  uniforms: { tDiffuse: { value: null }, tMask: { value: null }, uMaskOn: { value: 0 }, uTexel: { value: new T.Vector2(1, 1) }, uK: { value: 1 } },
+// painterly pass: anisotropic Kuwahara after Kyprianidis/Kang (as in M. Heckel's "On Crafting Painterly Shaders").
+// Pass 1 measures local image structure (a smoothed Sobel structure tensor); pass 2 runs an 8-sector circular kernel with
+// polynomial sector weights, squeezed and rotated along that structure, so strokes follow the forms. The subject mask keeps
+// Gesso and the ghosts airbrush-smooth, as in the painting.
+const TensorShader = {
+  uniforms: { tDiffuse: { value: null }, uTexel: { value: new T.Vector2(1, 1) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse, tMask; uniform vec2 uTexel; uniform float uMaskOn, uK; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform vec2 uTexel; varying vec2 vUv;
+    vec3 px(vec2 o){ return texture2D(tDiffuse, vUv + o * uTexel).rgb; }
+    void main(){
+      vec3 acc = vec3(0.0);
+      for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+        vec2 c = vec2(float(i), float(j)) * 2.0;
+        vec3 gx = (-px(c + vec2(-1, -1)) - 2.0 * px(c + vec2(-1, 0)) - px(c + vec2(-1, 1)) + px(c + vec2(1, -1)) + 2.0 * px(c + vec2(1, 0)) + px(c + vec2(1, 1))) * 0.25;
+        vec3 gy = (-px(c + vec2(-1, -1)) - 2.0 * px(c + vec2(0, -1)) - px(c + vec2(1, -1)) + px(c + vec2(-1, 1)) + 2.0 * px(c + vec2(0, 1)) + px(c + vec2(1, 1))) * 0.25;
+        float w = (i == 0 && j == 0) ? 0.25 : (i == 0 || j == 0) ? 0.125 : 0.0625;
+        acc += w * vec3(dot(gx, gx), dot(gy, gy), dot(gx, gy));
+      }
+      gl_FragColor = vec4(acc, 1.0);
+    }`,
+};
+const PaintShader = {
+  uniforms: { tDiffuse: { value: null }, tTensor: { value: null }, tMask: { value: null }, uMaskOn: { value: 0 }, uTexel: { value: new T.Vector2(1, 1) }, uK: { value: 1 }, uRadius: { value: 5 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse, tTensor, tMask; uniform vec2 uTexel; uniform float uMaskOn, uK, uRadius; varying vec2 vUv;
+    float polyW(float x, float y){ float p = (x + 0.1) - 0.5 * y * y; return max(0.0, p * p); }
     void main(){
       vec3 c0 = texture2D(tDiffuse, vUv).rgb;
-      if (uK < 0.01) { gl_FragColor = vec4(c0, 1.0); return; }
-      vec3 m[4]; vec3 s[4];
-      for (int q = 0; q < 4; q++) { m[q] = vec3(0.0); s[q] = vec3(0.0); }
-      vec2 st = uTexel * 1.5;
-      for (int j = 0; j <= 3; j++) for (int i = 0; i <= 3; i++) {
-        vec2 o = vec2(float(i), float(j)) * st;
-        vec3 a = texture2D(tDiffuse, vUv + vec2(-o.x, -o.y)).rgb; m[0] += a; s[0] += a * a;
-        vec3 b = texture2D(tDiffuse, vUv + vec2( o.x, -o.y)).rgb; m[1] += b; s[1] += b * b;
-        vec3 c = texture2D(tDiffuse, vUv + vec2( o.x,  o.y)).rgb; m[2] += c; s[2] += c * c;
-        vec3 d = texture2D(tDiffuse, vUv + vec2(-o.x,  o.y)).rgb; m[3] += d; s[3] += d * d;
-      }
-      vec3 best = c0; float bv = 1e9;
-      for (int q = 0; q < 4; q++) { vec3 mu = m[q] / 16.0; vec3 v = abs(s[q] / 16.0 - mu * mu); float vv = v.r + v.g + v.b; if (vv < bv) { bv = vv; best = mu; } }
       float subj = 0.0; if (uMaskOn > 0.5) { vec4 mk = texture2D(tMask, vUv); subj = max(mk.r, mk.g); }
-      gl_FragColor = vec4(mix(c0, best, uK * mix(0.85, 0.18, subj)), 1.0);
+      float k = uK * mix(0.95, 0.15, subj);
+      if (k < 0.02) { gl_FragColor = vec4(c0, 1.0); return; }
+      vec3 t = texture2D(tTensor, vUv).rgb; float E = t.x, G = t.y, F = t.z;
+      float D = sqrt((E - G) * (E - G) + 4.0 * F * F), l1 = 0.5 * (E + G + D), l2 = 0.5 * (E + G - D);
+      vec2 dir = vec2(l1 - E, -F); dir = length(dir) > 1e-6 ? normalize(dir) : vec2(0.0, 1.0);
+      float A = l1 + l2 > 1e-6 ? (l1 - l2) / (l1 + l2) : 0.0;
+      float R = uRadius, a = R * clamp((1.0 + A) / 1.0, 0.1, 2.0), b = R * clamp(1.0 / (1.0 + A), 0.1, 2.0);
+      mat2 rot = mat2(dir.x, dir.y, -dir.y, dir.x);
+      vec3 m[8]; vec3 s2[8]; float ws[8];
+      for (int q = 0; q < 8; q++) { m[q] = vec3(0.0); s2[q] = vec3(0.0); ws[q] = 0.0; }
+      for (int q = 0; q < 8; q++) {
+        float base = float(q) * 0.785398;
+        for (int r = 1; r <= 5; r++) {
+          float rr = float(r) / 5.0;
+          for (int o = -1; o <= 1; o++) {
+            float ang = base + float(o) * 0.3927, ca = cos(ang), sa = sin(ang);
+            vec2 v = vec2(ca, sa) * rr;                          // unit-disc sample
+            vec2 lv = vec2(dot(v, vec2(cos(base), sin(base))), dot(v, vec2(-sin(base), cos(base))));
+            float w = polyW(lv.x, lv.y) * exp(-rr * rr * 2.0);
+            vec2 off = rot * vec2(v.x * a, v.y * b) * uTexel;
+            vec3 c = texture2D(tDiffuse, vUv + off).rgb;
+            m[q] += c * w; s2[q] += c * c * w; ws[q] += w;
+          }
+        }
+      }
+      vec3 sum = vec3(0.0); float wsum = 0.0;
+      for (int q = 0; q < 8; q++) {
+        vec3 mu = m[q] / max(ws[q], 1e-5); vec3 var = abs(s2[q] / max(ws[q], 1e-5) - mu * mu);
+        float sg = dot(var, vec3(0.299, 0.587, 0.114)) * 40.0; float al = 1.0 / (1.0 + sg * sg * sg * sg);
+        sum += mu * al; wsum += al;
+      }
+      vec3 paint = sum / max(wsum, 1e-5);
+      vec3 col = mix(c0, paint, k);
+      // pencil contour: strong structure edges take a thin warm-umber line, lighter on the subjects (they already carry painted seams)
+      float edge = smoothstep(0.012, 0.05, sqrt(l1)) * uK * mix(1.0, 0.45, subj);
+      col = mix(col, col * vec3(0.55, 0.47, 0.36), edge * 0.55);
+      gl_FragColor = vec4(col, 1.0);
       #include <encodings_fragment>
     }`,
+};
+// the two-pass painter as one composer pass; exposes the paint uniforms as .uniforms so render() can drive it
+const PainterPass = T.Pass && T.Pass.FullScreenQuad && class extends T.Pass {
+  constructor() {
+    super();
+    this.rtT = new T.WebGLRenderTarget(4, 4, { type: T.HalfFloatType, format: T.RGBAFormat, minFilter: T.LinearFilter, magFilter: T.LinearFilter, depthBuffer: false });
+    this.tMat = new T.ShaderMaterial(TensorShader); this.pMat = new T.ShaderMaterial(PaintShader);
+    this.tMat.uniforms.uTexel = this.pMat.uniforms.uTexel; this.uniforms = this.pMat.uniforms;
+    this.tQuad = new T.Pass.FullScreenQuad(this.tMat); this.pQuad = new T.Pass.FullScreenQuad(this.pMat);
+  }
+  setSize(w, h) { this.rtT.setSize(w, h); }
+  render(renderer, writeBuffer, readBuffer) {
+    this.tMat.uniforms.tDiffuse.value = readBuffer.texture; renderer.setRenderTarget(this.rtT); this.tQuad.render(renderer);
+    this.pMat.uniforms.tDiffuse.value = readBuffer.texture; this.pMat.uniforms.tTensor.value = this.rtT.texture;
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer); if (this.clear) renderer.clear(); this.pQuad.render(renderer);
+  }
 };
 const FinalShader = {
   uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uExposure: { value: 1 }, uRes: { value: new T.Vector2(1, 1) },
@@ -612,7 +672,7 @@ if (HAS_POST) {
     if (T.BokehPass) { bokeh = new T.BokehPass(scene, camera, { focus: 4, aperture: 0.0009, maxblur: 0.0065, width: 4, height: 4 }); bokeh.enabled = false; bokeh.needsSwap = true; bokeh.setSize = function (w, h) { this.renderTargetDepth.setSize(w, h); }; composer.addPass(bokeh); }
     shaftPass = new T.ShaderPass(ShaftShader); composer.addPass(shaftPass);
     bloom = new T.UnrealBloomPass(new T.Vector2(256, 256), 0.55, 0.55, 1.5); composer.addPass(bloom);
-    paintPass = new T.ShaderPass(PaintShader); composer.addPass(paintPass);
+    paintPass = new PainterPass(); composer.addPass(paintPass);
     finalPass = new T.ShaderPass(FinalShader); composer.addPass(finalPass);
     // subject mask for the isolation grade: half-res RGBA8, no depth; sized in resize()
     maskRT = new T.WebGLRenderTarget(4, 4, { format: T.RGBAFormat, type: T.UnsignedByteType, minFilter: T.LinearFilter, magFilter: T.LinearFilter, depthBuffer: true, stencilBuffer: false });
