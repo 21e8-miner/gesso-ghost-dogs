@@ -1,9 +1,11 @@
 #!/bin/zsh
-# builds test.html (doctype wrapper + debug hook __dbg) from gesso-ghost-dogs.html
+# builds test.html: doctype wrapper, early error capture, and the __dbg hook (dbg_hook.js) swapped in for the SAVE_KEY line
 cd "$(dirname "$0")"
 python3 - <<'PY'
-s=open('gesso-ghost-dogs.html').read()
-a="const SAVE_KEY = 'gesso-ghost-dogs-v2';"
-s=s.replace(a,"const SAVE_KEY = 'dbg' + Math.random(); window.__dbg = { S, P, W, camS, get G(){ return G; }, get STEED(){ return STEED; }, step(dt){ update(dt); render(dt); }, cine(d,m){ cineStart(d,m); }, scene, camera, renderer, T, get ao(){ return aoPass; }, get composer(){ return composer; }, musicWav: (s, sc) => renderMusicWav(s, sc) };")
-open('test.html','w').write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.__E=[];window.addEventListener("error",e=>__E.push(String(e.error&&e.error.stack||e.message).slice(0,1200)))</script></head><body>\n'+s+'</body></html>')
+s = open('gesso-ghost-dogs.html').read()
+a = "const SAVE_KEY = 'gesso-ghost-dogs-v2';"
+assert s.count(a) == 1, 'SAVE_KEY anchor missing'
+s = s.replace(a, open('dbg_hook.js').read().strip())
+head = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.__E=[];window.addEventListener("error",e=>__E.push(String(e.error&&e.error.stack||e.message).slice(0,1200)))</script></head><body>\n'
+open('test.html', 'w').write(head + s + '</body></html>')
 PY

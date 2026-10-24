@@ -477,16 +477,16 @@ function refreshEnv() { const old = envRT; envRT = pmrem.fromScene(skyScene, 0.0
 const sun = new T.DirectionalLight(0xffffff, 2); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 520 });
 sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.5; scene.add(sun); scene.add(sun.target);
-const hemi = new T.HemisphereLight(0xbfd4ff, 0x8a7350, 0.7); scene.add(hemi);
+const hemi = new T.HemisphereLight(0xd6d0b4, 0x8a7350, 0.7); scene.add(hemi);
 const KF = [
-  [0.00, '#3a66b6', '#a9c3dd', '#ffecd0', 1.6, 0.22, 0.9],
-  [0.30, '#2d5cb2', '#bccfe0', '#fff2e0', 1.7, 0.22, 0.9],
-  [0.48, '#5d4c6c', '#f2a052', '#ffb070', 1.25, 0.3, 1.05],
-  [0.57, '#2a2442', '#c8723a', '#ff8a50', 0.65, 0.25, 1.15],
-  [0.65, '#0b1026', '#2c2a46', '#8fa0d0', 0.3, 0.22, 1.6],
-  [0.90, '#070b1c', '#1d2442', '#8fa0d0', 0.3, 0.22, 1.6],
-  [0.96, '#3a3a64', '#e09a7a', '#ffc8a0', 0.85, 0.3, 1.1],
-  [1.00, '#3a66b6', '#a9c3dd', '#ffecd0', 1.6, 0.22, 0.9],
+  [0.00, '#8f8a70', '#d2cbb0', '#fff0d8', 1.6, 0.22, 0.9],
+  [0.30, '#8c8a74', '#d8d2b8', '#fff4e2', 1.7, 0.22, 0.9],
+  [0.48, '#6e6250', '#e2c495', '#ffcf96', 1.25, 0.3, 1.05],
+  [0.57, '#4a4034', '#c9a070', '#ffaa6a', 0.65, 0.25, 1.15],
+  [0.65, '#1e1c16', '#3d3a2c', '#b8c0a8', 0.3, 0.22, 1.6],
+  [0.90, '#16150f', '#33322a', '#b8c0a8', 0.3, 0.22, 1.6],
+  [0.96, '#5c5444', '#d9b48e', '#ffd2a8', 0.85, 0.3, 1.1],
+  [1.00, '#8f8a70', '#d2cbb0', '#fff0d8', 1.6, 0.22, 0.9],
 ].map(k => ({ f: k[0], top: C(k[1]), hor: C(k[2]), sun: C(k[3]), sunI: k[4], hemi: k[5], exp: k[6] }));
 const DAY = 420;
 const SKYV = { top: new T.Color(), hor: new T.Color(), sun: new T.Color(), sunI: 2, hemi: 0.7, exp: 1, night: 0, f: 0 };
@@ -567,8 +567,8 @@ const PaintShader = {
       for (int q = 0; q < 8; q++) { m[q] = vec3(0.0); s2[q] = vec3(0.0); ws[q] = 0.0; }
       for (int q = 0; q < 8; q++) {
         float base = float(q) * 0.785398;
-        for (int r = 1; r <= 5; r++) {
-          float rr = float(r) / 5.0;
+        for (int r = 1; r <= 4; r++) {
+          float rr = float(r) / 4.0;
           for (int o = -1; o <= 1; o++) {
             float ang = base + float(o) * 0.3927, ca = cos(ang), sa = sin(ang);
             vec2 v = vec2(ca, sa) * rr;                          // unit-disc sample
@@ -583,15 +583,15 @@ const PaintShader = {
       vec3 sum = vec3(0.0); float wsum = 0.0;
       for (int q = 0; q < 8; q++) {
         vec3 mu = m[q] / max(ws[q], 1e-5); vec3 var = abs(s2[q] / max(ws[q], 1e-5) - mu * mu);
-        float sg = dot(var, vec3(0.299, 0.587, 0.114)) * 40.0; float al = 1.0 / (1.0 + sg * sg * sg * sg);
+        float sg = dot(var, vec3(0.299, 0.587, 0.114)) * 14.0; float al = 1.0 / (1.0 + sg * sg);   // soft sector blend: airbrushed, not blotched
         sum += mu * al; wsum += al;
       }
       vec3 paint = sum / max(wsum, 1e-5);
       k *= 1.0 - clamp(dot(c0 - paint, vec3(0.3, 0.55, 0.15)) * 2.5, 0.0, 1.0);
       vec3 col = mix(c0, paint, k);
       // pencil contour: strong structure edges take a thin warm-umber line, lighter on the subjects (they already carry painted seams)
-      float edge = smoothstep(0.012, 0.05, sqrt(l1)) * uK * mix(1.0, 0.45, subj);
-      col = mix(col, col * vec3(0.55, 0.47, 0.36), edge * 0.55);
+      float edge = smoothstep(0.02, 0.07, sqrt(l1)) * uK * mix(1.0, 0.45, subj);
+      col = mix(col, col * vec3(0.55, 0.47, 0.36), edge * 0.3);
       gl_FragColor = vec4(col, 1.0);
       #include <encodings_fragment>
     }`,
@@ -710,7 +710,7 @@ const PainterPass = T.Pass && FSQ && class extends T.Pass {
     this.tMat.uniforms.uTexel = this.pMat.uniforms.uTexel; this.uniforms = this.pMat.uniforms;
     this.tQuad = new FSQ(this.tMat); this.pQuad = new FSQ(this.pMat);
   }
-  setSize(w, h) { this.rtT.setSize(w, h); }
+  setSize(w, h) { this.rtT.setSize(Math.max(1, w >> 1), Math.max(1, h >> 1)); }
   render(renderer, writeBuffer, readBuffer) {
     this.tMat.uniforms.tDiffuse.value = readBuffer.texture; renderer.setRenderTarget(this.rtT); this.tQuad.render(renderer);
     this.pMat.uniforms.tDiffuse.value = readBuffer.texture; this.pMat.uniforms.tTensor.value = this.rtT.texture;
@@ -719,13 +719,22 @@ const PainterPass = T.Pass && FSQ && class extends T.Pass {
 };
 const FinalShader = {
   uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uExposure: { value: 1 }, uRes: { value: new T.Vector2(1, 1) },
-    tMask: { value: null }, uMaskOn: { value: 0 }, uIso: { value: 0 }, uIsoB: { value: 0 }, uTexel: { value: new T.Vector2(1, 1) }, uFocusUV: { value: new T.Vector2(0.5, 0.5) } },
+    tMask: { value: null }, uMaskOn: { value: 0 }, uMapK: { value: 1 }, uIso: { value: 0 }, uIsoB: { value: 0 }, uTexel: { value: new T.Vector2(1, 1) }, uFocusUV: { value: new T.Vector2(0.5, 0.5) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse, tMask; uniform float uTime, uExposure, uMaskOn, uIso, uIsoB; uniform vec2 uRes, uTexel, uFocusUV; varying vec2 vUv;
+    uniform sampler2D tDiffuse, tMask; uniform float uTime, uExposure, uMaskOn, uIso, uIsoB, uMapK; uniform vec2 uRes, uTexel, uFocusUV; varying vec2 vUv;
     vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); }
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     float mval(vec2 uv){ vec4 s = texture2D(tMask, uv); return max(s.r, s.g * 0.6); }
+    vec3 paintMap(float x){
+      // stops at luma 16, 48, ... 240: #140f0c #383027 #5a4f3a #7c6f56 #9c9175 #b9b094 #d7ccac #efe9cf
+      float t = clamp((x * 255.0 - 16.0) / 32.0, 0.0, 7.0);
+      vec3 c = mix(vec3(0.078, 0.059, 0.047), vec3(0.220, 0.188, 0.153), clamp(t, 0.0, 1.0));
+      c = mix(c, vec3(0.353, 0.310, 0.227), clamp(t - 1.0, 0.0, 1.0)); c = mix(c, vec3(0.486, 0.435, 0.337), clamp(t - 2.0, 0.0, 1.0));
+      c = mix(c, vec3(0.612, 0.569, 0.459), clamp(t - 3.0, 0.0, 1.0)); c = mix(c, vec3(0.725, 0.690, 0.580), clamp(t - 4.0, 0.0, 1.0));
+      c = mix(c, vec3(0.843, 0.800, 0.675), clamp(t - 5.0, 0.0, 1.0)); c = mix(c, vec3(0.937, 0.914, 0.812), clamp(t - 6.0, 0.0, 1.0));
+      return c;
+    }
     void main(){
       vec2 c = vUv - 0.5; float k = dot(c, c) * 0.006;
       vec3 col = vec3(texture2D(tDiffuse, vUv - c * k).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv + c * k).b);
@@ -745,21 +754,15 @@ const FinalShader = {
       col = mix(col, col * vec3(0.7, 0.68, 0.66), b * 0.3 * uIsoB);
       col = aces(col * uExposure);
       col = pow(col, vec3(1.0 / 2.2));
-      // muted olive grade
-      float l = dot(col, vec3(0.299, 0.587, 0.114));
-      vec3 pre = col;
-      col = mix(vec3(l), col, 0.88);
-      col = mix(col, smoothstep(0.0, 1.0, col), 0.5);
-      col *= mix(vec3(0.36, 0.34, 0.25) / 0.32, vec3(1.0, 0.98, 0.93), smoothstep(0.15, 0.7, l));
-      // the painting's palette: shadows lean umber-olive, mid-tones ochre, lights ivory; blue sky kept but quieted
-      float lp = dot(col, vec3(0.299, 0.587, 0.114));
-      vec3 tint = mix(mix(vec3(0.92, 0.86, 0.66), vec3(1.04, 0.98, 0.84), smoothstep(0.2, 0.55, lp)), vec3(1.03, 1.0, 0.92), smoothstep(0.6, 0.95, lp));
-      float blu = clamp((col.b - max(col.r, col.g)) * 4.0, 0.0, 1.0);
-      col = mix(col * tint, mix(vec3(lp), col, 0.82), blu);
-      col = mix(col, col * col * (3.0 - 2.0 * col), 0.25);
-      col = col * 0.985 + vec3(0.01, 0.009, 0.006);
+      // the painting's own tone curve, measured from the reference (mean colour of each luminance band), applied as a gradient map:
+      // the world goes almost wholly into its umber-olive-cream; Gesso and the ghosts keep more of their own glazes
+      float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
+      float lt = clamp(0.03 + 0.97 * pow(l, 0.9), 0.0, 1.0);
+      lt = mix(lt, lt * lt * (3.0 - 2.0 * lt), 0.35);                // the painting's range: deep umber darks, bright cream lights
+      vec3 pm = paintMap(lt), chroma = col - vec3(l);
+      vec3 wcol = mix(col, pm + chroma * 0.28, uMapK);
+      col = mix(wcol, mix(pm, col, 0.8) + chroma * 0.3, clamp(m * 1.2, 0.0, 1.0));
       float lg = dot(col, vec3(0.299, 0.587, 0.114));
-      col = mix(col, max(pre - l + lg, vec3(0.0)), m * 0.6);
       vec2 fc = vUv - uFocusUV;
       col *= mix(0.6, 1.0, smoothstep(0.9, 0.25, length(fc * vec2(1.05, 1.0))));
       // paper: a faint canvas weave and fibre tooth, strongest in the lights, grain refreshed at ~12 fps so it never sizzles
@@ -775,7 +778,7 @@ if (HAS_POST) {
   try {
     const rto = { type: T.HalfFloatType, format: T.RGBAFormat, minFilter: T.LinearFilter, magFilter: T.LinearFilter };
     // multisampled scene target on WebGL2: clean silhouettes on the plaster and the panes
-    const rt = renderer.capabilities.isWebGL2 && T.WebGLMultisampleRenderTarget ? Object.assign(new T.WebGLMultisampleRenderTarget(4, 4, rto), { samples: 4 }) : new T.WebGLRenderTarget(4, 4, rto);
+    const rt = renderer.capabilities.isWebGL2 && T.WebGLMultisampleRenderTarget ? Object.assign(new T.WebGLMultisampleRenderTarget(4, 4, rto), { samples: 2 }) : new T.WebGLRenderTarget(4, 4, rto);
     composer = new T.EffectComposer(renderer, rt);
     composer.addPass(new T.RenderPass(scene, camera));
     if (AOPass && (renderer.capabilities.isWebGL2 || renderer.extensions.get('WEBGL_depth_texture'))) { aoPass = new AOPass(scene, camera); composer.addPass(aoPass); }
@@ -1086,7 +1089,7 @@ const _clV = new T.Vector3(), _clP = new T.Vector3(), _clW = new T.Color(1, 1, 1
 // painted-plaster value ramp (sRGB stops, decoded in the shader): olive-umber shadow, a narrow mint kiss at the terminator, ivory light
 const RAMP_TEX = (() => {
   const c = document.createElement('canvas'); c.width = 256; c.height = 1; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 256, 0);
-  [[0, '#3b3226'], [0.16, '#574d3b'], [0.3, '#7d775c'], [0.4, '#8f957a'], [0.46, '#b9b08a'], [0.56, '#d6c495'], [0.7, '#e9d9ae'], [0.85, '#f4e8c6'], [1, '#fcf6e4']].forEach(([o, col]) => gr.addColorStop(o, col));
+  [[0, '#2a1d16'], [0.16, '#4f4433'], [0.3, '#7a6d4f'], [0.4, '#9a8e64'], [0.46, '#b9a874'], [0.56, '#d6c07e'], [0.7, '#e8d6a0'], [0.85, '#f3e7c2'], [1, '#fbf5e0']].forEach(([o, col]) => gr.addColorStop(o, col));
   g.fillStyle = gr; g.fillRect(0, 0, 256, 1);
   const t = new T.CanvasTexture(c); t.encoding = T.LinearEncoding; t.minFilter = T.LinearFilter; t.magFilter = T.LinearFilter; t.generateMipmaps = false; t.wrapS = T.ClampToEdgeWrapping; t.wrapT = T.ClampToEdgeWrapping;
   return t;
@@ -1110,14 +1113,16 @@ function plasterMat(map, nmap, opt = {}) {
       vec3 plLk = normalize(uKeyV); float plNl = dot(normal, plLk);
       float plFall = mix(1.0, mix(0.5, 1.0, smoothstep(0.75, 1.7, vH - uGroundY)), uFall);
       // terminator mid-ramp: forms turning from the key fall into olive-umber; cast shadows blend toward olive rather than sliding through the ramp
-      float plX = clamp(plNl * 0.56 + 0.47, 0.0, 1.0);
+      float plX = clamp(plNl * 0.68 + 0.43, 0.0, 1.0);
       vec3 plRL = pow(texture2D(uRamp, vec2(clamp(plX, 0.005, 0.995), 0.5)).rgb, vec3(2.2));
       vec3 plRS = pow(texture2D(uRamp, vec2(clamp(min(plX * 0.55, 0.26), 0.005, 0.995), 0.5)).rgb, vec3(2.2));
       vec3 plRamp = mix(plRS, plRL, plOcc);
       vec3 plAlb = diffuseColor.rgb / vec3(0.855, 0.716, 0.445);
       vec3 plSty = plRamp * plAlb * uKeyI * uKeyTint * mix(0.6, 1.0, plFall);
       float plFacing = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
-      plSty += vec3(0.30, 0.55, 0.45) * 0.09 * exp(-pow(plNl / 0.14, 2.0)) * plOcc * plFacing * uKeyI;  // a narrow mint kiss at the terminator, never on silhouettes or in cast shadow
+      plSty += vec3(0.30, 0.55, 0.45) * 0.16 * exp(-pow(plNl / 0.2, 2.0)) * plOcc * plFacing * uKeyI;  // a mint kiss at the terminator, never in cast shadow
+      plSty += vec3(0.42, 0.8, 0.68) * 0.5 * pow(1.0 - plFacing, 2.0) * smoothstep(0.4, -0.2, plNl) * uKeyI;  // the painting's mint glaze along shadow-side contours
+      plSty += vec3(1.0, 0.72, 0.58) * 0.06 * exp(-pow((plNl - 0.18) / 0.16, 2.0)) * plOcc * uKeyI;            // peach where the form turns
       vec3 plNW = inverseTransformDirection(normal, viewMatrix);
       plSty += diffuseColor.rgb * vec3(0.55, 0.32, 0.18) * 0.08 * clamp(-plNW.y, 0.0, 1.0) * uKeyI;
       vec3 plVv = normalize(vViewPosition); vec3 plHh = normalize(plLk + plVv);
@@ -1303,7 +1308,7 @@ function ghostMat() {
 // unit helpers: JS smoothstep, the shared ambient for ghost panes, the pane palette and the body profiles
 const sstep = (a, b, x) => smooth(clamp((x - a) / (b - a), 0, 1));
 const GHOSTU = { uAmb: { value: new T.Color(0.3, 0.3, 0.3) }, uGlow: { value: 0.2 } }, GHOST_RIBS = [];
-const GHOST_PAL = [['#ece1c6', 0.45], ['#e3b796', 0.25], ['#9a8977', 0.22], ['#a9dcc7', 0.08]];
+const GHOST_PAL = [['#e2cfa4', 0.35], ['#d9b48a', 0.3], ['#c4a37c', 0.17], ['#a88d6e', 0.1], ['#a9dcc7', 0.08]];
 // torso cross-section [rx, ry, cy] at t in 0..1 (rump to chest): deep chest, tucked waist, rounded haunch
 const baseProf = t => {
   const shape = Math.pow(Math.sin(Math.PI * (0.06 + 0.88 * t)), 0.55), w = Math.exp(-(((t - 0.42) / 0.14) ** 2));
@@ -1407,8 +1412,10 @@ function plateGhostMat(o = {}) {
         float e = 1.0 - smoothstep(0.0, max(0.06, fwidth(vEdge) * 1.5), vEdge);
         vec3 L = normalize(uKeyV); float nl = dot(n, L);
         vec3 col = vTint * uTintMul * (uAmb + uGlow + uSunC * 0.62 * (0.4 + 0.6 * max(nl, 0.0))) + 0.15 * uSunC * vTint * max(-nl, 0.0);
-        col = max(col, vTint * uTintMul * 0.55);  // milky glass never sinks below the sand behind it
-        if (vInk < 0.0) col = mix(col, uDeep * 0.6, 0.55 * e); else col *= 1.0 + 0.22 * e;
+        col = max(col, vTint * uTintMul * 0.68);  // milky glass never sinks below the sand behind it
+        col *= mix(0.86, 1.06, clamp(n.y * 0.5 + 0.5, 0.0, 1.0));   // lit from above, warmer and deeper underneath, as painted
+        if (vInk < 0.0) col = mix(col, uDeep * 0.6, 0.32 * e); else col *= 1.0 + 0.22 * e;
+        col += vec3(0.45, 0.85, 0.72) * 0.1 * smoothstep(0.55, 0.9, n.y) * (0.5 + 0.5 * e);   // mint along the top edges
         if (uFan > 0.5) {
           float fa = atan(vLoc.y, vLoc.x) * 30.0, fr2 = length(vLoc) / 0.21;
           col *= 1.0 - 0.09 * smoothstep(0.8, 1.0, abs(sin(fa))) * clamp(1.5 - fwidth(fa) * 0.5, 0.0, 1.0);
@@ -1425,7 +1432,7 @@ function plateGhostMat(o = {}) {
         // thin-film shimmer on the rim, held to the painting's mint-peach range
         vec3 irid = 0.5 + 0.5 * cos(6.2832 * (fr * 1.6 + flow * 0.6 + vec3(0.0, 0.33, 0.67)));
         col += mix(irid, vec3(0.75, 0.95, 0.85), 0.45) * fr * fr * 0.16;
-        gl_FragColor = vec4(col, uAlpha * uAlphaMul * vOp * (0.46 + 0.14 * e + 0.15 * fr + band * 0.06) * (1.0 + uGlow * 0.5));
+        gl_FragColor = vec4(col, uAlpha * uAlphaMul * vOp * (0.56 + 0.12 * e + 0.12 * fr + band * 0.06) * (1.0 + uGlow * 0.5));
         #include <fog_fragment>
         #include <encodings_fragment>
       }`;
@@ -1497,7 +1504,7 @@ function steedHeadCore(seed, z0, len) {
   for (let i = 0; i < SEC.length - 1; i++) for (let j = 0; j < M; j++) { const a = ring[i][j], b = ring[i][(j + 1) % M], c = ring[i + 1][(j + 1) % M], d = ring[i + 1][j]; tri(a, c, b); tri(a, d, c); }
   for (const [rr, s] of [[ring[0], -1], [ring[SEC.length - 1], 1]]) { const ctr = rr.reduce((v, p) => v.add(p), new T.Vector3()).multiplyScalar(1 / M); for (let j = 0; j < M; j++) s > 0 ? tri(ctr, rr[(j + 1) % M], rr[j]) : tri(ctr, rr[j], rr[(j + 1) % M]); }
   const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
-  return ghostAttrs(facetGeo(g, 0.008, seed * 23 + 5), C('#7d7064'), 0.8);
+  return ghostAttrs(facetGeo(g, 0.008, seed * 23 + 5), C('#5a5046'), 0.92);
 }
 function buildDog(tint, o = {}) {
   const legK = o.legK || 1, neckK = o.neckK || 1, seed = o.seed || 1, tc = C(tint), echo = !!o.echo, steed = !!o.steed;
@@ -1534,7 +1541,7 @@ function buildDog(tint, o = {}) {
   if (steed) {
     // the hero scapula fan, one per side
     const fm = plateGhostMat({ fan: true }); fm.uniforms.uAlpha = pm.uniforms.uAlpha; fm.uniforms.uAlphaMul.value = 1.6; fm.uniforms.uDeep.value.copy(pm.uniforms.uDeep.value); fm.uniforms.uRim.value.copy(pm.uniforms.uRim.value);
-    const fg = fanGeo(C('#ece1c6')), [frx, , fcy] = prof(0.72);
+    const fg = fanGeo(C('#dcc8a0')), [frx, , fcy] = prof(0.72);
     for (const s of [-1, 1]) { const fh = new T.Group(); fh.position.set(s * frx * 0.98, fcy + 0.02, Z0 + 0.72 * LEN); fh.rotation.set(0, s * 1.45, s * 0.15); fh.scale.x = s; body.add(fh); ghost(fg, fm, fh, shT); }
   }
   // the vertebral column: a pale herringbone sunk into the panes, mint discs and a mint glaze line each side
@@ -1566,7 +1573,7 @@ function buildDog(tint, o = {}) {
   // the long, low, darker head
   const head = new T.Group(); head.position.set(0, 0.25 + 0.13 * (neckK - 1) + 0.03, 0.56 + 0.12 * (neckK - 1)); body.add(head);
   const hprof = o.headProf || (t => [lerp(0.085, 0.032, Math.pow(t, 0.8)), lerp(0.095, 0.038, t), lerp(0.012, -0.032, t)]);
-  const hopt = steed ? { palette: [['#7d7064', 0.5], ['#9a8c80', 0.5]], paletteIn: [['#d9c8ad', 1]], innerDark: 1 } : { tint: tc.clone().lerp(C('#6e6152'), 0.6) };
+  const hopt = steed ? { palette: [['#5e544a', 0.5], ['#7a6e62', 0.5]], paletteIn: [['#d9c8ad', 1]], innerDark: 1 } : { tint: tc.clone().lerp(C('#6e6152'), 0.6) };
   if (steed) ghost(steedHeadCore(seed, -0.11, o.headLen || 0.33), pmH, head);
   ghost(plateShell(Object.assign({ seed: seed * 7 + 3, prof: hprof, z0: -0.11, len: o.headLen || 0.33, n: steed ? 22 : 18, cover: 2.7, op: steed ? [0.75, 0.68] : [0.85, 0.78], cov: 1.3, strip: steed }, hopt)), pmH, head);
   const gmH = ghostMat(); gmH.uniforms.uAlpha = gm.uniforms.uAlpha; gmH.uniforms.uColor.value.copy(pmH.uniforms.uColor.value); gmH.uniforms.uRim.value.copy(pmH.uniforms.uRim.value);
@@ -2722,9 +2729,14 @@ $('mapview').addEventListener('click', e => { if (e.target.id === 'mapview') tog
 function syncSound() { $('bSound').textContent = muted ? 'Sound off' : 'Sound on'; $('bSound').setAttribute('aria-pressed', String(!muted)); }
 $('bSound').addEventListener('click', e => { e.currentTarget.blur(); muted = !muted; store.set('gesso-muted', muted ? '1' : '0'); syncSound(); if (muted && master) master.gain.value = 0; else if (!muted) { audioInit(); if (master) master.gain.value = 0.75; } });
 syncSound();
+// a pixel budget: big retina windows render at most ~2.8 MP on high (~1.2 MP on light), since the post chain holds many full-size buffers
+function budgetDPR() {
+  const hi = quality === 'high', dpr = window.devicePixelRatio || 1, vw = Math.max(1, window.innerWidth), vh = Math.max(1, window.innerHeight);
+  return Math.min(hi ? Math.min(dpr, 1.75) : Math.min(dpr, 1) * 0.8, Math.sqrt((hi ? 2.8e6 : 1.2e6) / (vw * vh)));
+}
 function applyQuality() {
   const hi = quality === 'high', dpr = window.devicePixelRatio || 1;
-  renderer.setPixelRatio(hi ? Math.min(dpr, 1.75) : Math.min(dpr, 1) * 0.8);
+  renderer.setPixelRatio(budgetDPR());
   renderer.shadowMap.enabled = hi; sun.castShadow = hi;
   scene.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.needsUpdate = true; }); });
   $('bQuality').textContent = `Graphics: ${hi ? 'high' : 'light'}`; resize();
@@ -2964,6 +2976,7 @@ function update(dt) {
 let VW = 1, VH = 1;
 function resize() {
   VW = window.innerWidth; VH = window.innerHeight;
+  if (Math.abs(renderer.getPixelRatio() - budgetDPR()) > 0.01) renderer.setPixelRatio(budgetDPR());
   renderer.setSize(VW, VH, false); camera.aspect = VW / VH; camera.updateProjectionMatrix();
   const pr = renderer.getPixelRatio();
   if (composer) { composer.setPixelRatio(pr); composer.setSize(VW, VH); finalPass.uniforms.uRes.value.set(VW * pr, VH * pr); finalPass.uniforms.uTexel.value.set(1 / Math.max(1, VW * pr), 1 / Math.max(1, VH * pr)); paintPass.uniforms.uTexel.value.copy(finalPass.uniforms.uTexel.value); if (maskRT) maskRT.setSize(Math.max(1, Math.round(VW * pr / 2)), Math.max(1, Math.round(VH * pr / 2))); }
@@ -2971,6 +2984,8 @@ function resize() {
   if (mapOpen) drawMap();
 }
 window.addEventListener('resize', resize);
+cv.addEventListener('webglcontextlost', e => { e.preventDefault(); try { save(); } catch (err) {} store.set('gesso-quality', 'light'); });
+cv.addEventListener('webglcontextrestored', () => location.reload());
 const _tgt = new T.Vector3(), _cam = new T.Vector3(), _look = new T.Vector3(0, 1, 10), _hp = new T.Vector3(), _v2c = new T.Color();
 const ECHO_DT = [0.085, 0.17, 0.255], STEED_DT = [0.055, 0.11, 0.165, 0.22];
 // steed exposures: gallop time-trail alphas, and the painting's double exposure at rest (cover / riding), echoes 0 and 1 only
@@ -3063,22 +3078,26 @@ const DEG = Math.PI / 180, FAR0 = camera.far, STG_SUNC = C('#ffe8c8');
 const _hipsW = new T.Vector3(), _fwdW = new T.Vector3(), _camDir = new T.Vector3(), _fuv = new T.Vector2(0.5, 0.5), _fuvT = new T.Vector2(0.5, 0.5), _ccSave = new T.Color();
 function buildStage() {
   const m = new T.ShaderMaterial({
-    uniforms: { uHalo: { value: new T.Vector2(0.4, 0.45) } },
+    uniforms: { uHalo: { value: new T.Vector2(0.4, 0.45) }, uGut: { value: 0 } },
     vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: `
-      uniform vec2 uHalo; varying vec2 vUv;
+      uniform vec2 uHalo; uniform float uGut; varying vec2 vUv;
       float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
       void main(){
         float d = dot(vUv - vec2(0.0, 1.0), normalize(vec2(1.0, -0.35)));
-        vec3 col = mix(vec3(0.235, 0.208, 0.145), vec3(0.3098, 0.2902, 0.2), clamp(d / 0.35, 0.0, 1.0));
-        col = mix(col, vec3(0.5608, 0.5255, 0.3922), clamp((d - 0.35) / 0.35, 0.0, 1.0));
-        col = mix(col, vec3(0.7882, 0.7569, 0.6275), clamp((d - 0.7) / 0.3, 0.0, 1.0));
+        vec3 col = mix(vec3(0.24, 0.225, 0.18), vec3(0.34, 0.325, 0.26), clamp(d / 0.35, 0.0, 1.0));
+        col = mix(col, vec3(0.6, 0.57, 0.46), clamp((d - 0.35) / 0.35, 0.0, 1.0));
+        col = mix(col, vec3(0.7, 0.67, 0.56), clamp((d - 0.7) / 0.3, 0.0, 1.0));
         float n = vn(vUv * vec2(5.0, 4.0)) * 0.6 + vn(vUv * 13.0 + 7.3) * 0.4;
         col *= 1.0 + (n - 0.5) * 0.08;
         vec2 q = (vUv - uHalo) * vec2(1.6, 1.0);
         col *= 1.0 - 0.28 * exp(-dot(q, q) * 5.0);
+        // the reference is a book scan: a soft gutter fold, and the facing page a little cooler and paler
+        float gx = vUv.x - 0.615;
+        col *= 1.0 - uGut * (0.3 * exp(-pow(gx / 0.008, 2.0)) + 0.12 * exp(-pow(gx / 0.04, 2.0)));
+        col = mix(col, col * vec3(0.98, 1.01, 0.98) + vec3(0.025, 0.03, 0.025), uGut * smoothstep(0.004, 0.03, gx));
         col = pow(max(col, vec3(0.0)), vec3(2.2)) * 1.4;
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
@@ -3110,7 +3129,7 @@ function render(dt) {
   skyMat.uniforms.uTop.value.copy(sv.top); skyMat.uniforms.uHor.value.copy(sv.hor); skyMat.uniforms.uSunCol.value.copy(sv.sun);
   skyMat.uniforms.uSun.value.copy(_sunDir); skyMat.uniforms.uNight.value = sv.night; skyMat.uniforms.uCloud.value.copy(sv.hor).lerp(new T.Color(1, 1, 1), 0.45 * (1 - sv.night));
   scene.fog.color.copy(sv.hor).multiplyScalar(0.92); scene.fog.density = 0.0019 + sv.night * 0.0006;
-  SANDU.uSandL.value.copy(_ld); SANDU.uSandC.value.copy(sun.color).multiplyScalar(sun.intensity * 0.6).lerp(_shC.setRGB(0.55, 0.75, 0.8), SKYV.night * 0.7); SANDU.uGlit.value = lerp(6, 9, SKYV.night);
+  SANDU.uSandL.value.copy(_ld); SANDU.uSandC.value.copy(sun.color).multiplyScalar(sun.intensity * 0.6).lerp(_shC.setRGB(0.55, 0.75, 0.8), SKYV.night * 0.7); SANDU.uGlit.value = lerp(1.6, 3, SKYV.night);
   AIRU.uCam.value.copy(camera.position); AIRU.uSun.value.copy(_sunDir); AIRU.uSunC.value.copy(sun.color).multiplyScalar(0.55 * clamp(_sunDir.y * 4 + 0.3, 0, 1)); AIRU.uNight.value = SKYV.night;
   AIRU.uScale.value = VH * renderer.getPixelRatio() / (2 * Math.tan(camera.fov * DEG / 2)); AIRU.uK.value = quality === 'high' ? 1 : 0.6;
   FOGU.uFogSun.value.copy(_sunDir); FOGU.uFogSunCol.value.copy(sv.sun).multiplyScalar(0.9 * clamp(_sunDir.y * 4 + 0.4, 0, 1)).lerp(sv.hor, 0.35);
@@ -3135,12 +3154,12 @@ function render(dt) {
   let fovT = 55, phK = 0;
   if (hero) {
     // the painting's framing: long lens, ~22 deg behind profile, crown to seat ~66% of frame height, crown ~8% below the top edge
-    const a = P.head - Math.PI / 2 - 0.38 + Math.sin(S.t * 0.08) * 0.03, sa = Math.sin(a), ca = Math.cos(a);
+    const a = P.head - Math.PI / 2 - 0.26 + Math.sin(S.t * 0.08) * 0.03, sa = Math.sin(a), ca = Math.cos(a);
     const crownY = _hp.y + 0.15, seatY = _hipsW.y - GESSO_SEAT_DROP, cs = Math.max(0.9, crownY - seatY);
-    const t2 = 2 * Math.tan(14 * DEG), dist = Math.max(cs / (0.56 * t2), 2.3 / (0.92 * t2 * camera.aspect)), visH = t2 * dist;
-    _tgt.copy(_hipsW).addScaledVector(_fwdW, 0.5); _tgt.y = crownY - 0.4 * visH;
+    const t2 = 2 * Math.tan(14 * DEG), dist = Math.max(cs / (0.7 * t2), 1.9 / (0.92 * t2 * camera.aspect)), visH = t2 * dist;
+    _tgt.copy(_hipsW).addScaledVector(_fwdW, 0.5); _tgt.y = crownY - 0.46 * visH;
     _cam.set(_tgt.x + sa * dist, _tgt.y - 0.05, _tgt.z + ca * dist);
-    if (VW > 900) { _tgt.x += ca * dist * 0.08; _tgt.z -= sa * dist * 0.08; }
+    if (VW > 900) { _tgt.x += ca * dist * 0.025; _tgt.z -= sa * dist * 0.025; }
     // slow push-in dwell toward head and shoulders (crown to chin ~55% of frame height at fov 20)
     const u = clamp(1.6 * (0.5 + 0.5 * Math.sin(S.t * 0.11 - 1.4)) - 0.3, 0, 1);
     phK = u * u * u * (u * (u * 6 - 15) + 10);
@@ -3179,7 +3198,7 @@ function render(dt) {
   if (stageOn) {
     const h = 2 * Math.tan(camera.fov * DEG / 2) * stD * 1.4;
     STAGE.position.copy(camera.position).addScaledVector(_camDir, stD); STAGE.quaternion.copy(camera.quaternion); STAGE.scale.set(h * camera.aspect, h, 1); STAGE.visible = true;
-    _v.copy(_hipsW); _v.y += 0.18; _v.project(camera); STAGE.material.uniforms.uHalo.value.set(0.5 + clamp(_v.x, -1.4, 1.4) * 0.5 / 1.4, 0.5 + clamp(_v.y, -1.4, 1.4) * 0.5 / 1.4);
+    STAGE.material.uniforms.uGut.value = heroK; _v.copy(_hipsW); _v.y += 0.18; _v.project(camera); STAGE.material.uniforms.uHalo.value.set(0.5 + clamp(_v.x, -1.4, 1.4) * 0.5 / 1.4, 0.5 + clamp(_v.y, -1.4, 1.4) * 0.5 / 1.4);
     scene.fog.density = 0;
   } else STAGE.visible = false;
   const baseL = stageOn ? 4 : 0; camera.layers.set(baseL);
@@ -3192,7 +3211,7 @@ function render(dt) {
   const expo = lerp(sv.exp, 0.9, heroK);
   if (composer) {
     const fu = finalPass.uniforms;
-    fu.uTime.value = S.t; fu.uExposure.value = expo;
+    fu.uTime.value = S.t; fu.uExposure.value = expo; fu.uMapK.value = lerp(1, 0.4, heroK);
     bloom.strength = lerp(0.3 + 0.45 * sv.night, 0.25, heroK); bloom.enabled = true;
     // isolation drive: the card already isolates the title; staged close-ups get a lighter touch so the card is not doubled
     isoK = lerp(isoK, hero ? 0 : cine ? (stageOn ? 0.4 : 1.0) : prof ? 0.75 : 0.45, dk);
