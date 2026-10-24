@@ -264,6 +264,9 @@ function instanced(geo, material, list, o = {}) {
     _m4.compose(_p, _q, _s); im.setMatrixAt(i, _m4); if (it.c) im.setColorAt(i, it.c);
   });
   im.count = list.length;
+  // every instanced mesh carries instance colours (white when unused): r128 caches an override material's program without
+  // tracking instance colours, so the AO depth pass would otherwise read a missing buffer
+  if (!im.instanceColor) im.instanceColor = new T.InstancedBufferAttribute(new Float32Array(Math.max(1, list.length) * 3).fill(1), 3);
   im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
   im.frustumCulled = false; im.castShadow = !!o.cast; im.receiveShadow = o.receive !== false;
   return im;
@@ -502,7 +505,7 @@ function skyState(clock) {
 }
 
 // ================================================================= post
-let composer = null, bloom = null, finalPass = null, bokeh = null, paintPass = null, shaftPass = null;
+let composer = null, bloom = null, finalPass = null, bokeh = null, paintPass = null, shaftPass = null, aoPass = null;
 // light shafts: march from each pixel toward the sun's screen position gathering bright sky; spires and towers carve the rays
 const ShaftShader = {
   uniforms: { tDiffuse: { value: null }, uSun: { value: new T.Vector2(0.5, 0.5) }, uK: { value: 0 }, uCol: { value: new T.Color(1, 0.85, 0.6) } },
@@ -594,13 +597,118 @@ const PaintShader = {
     }`,
 };
 // the two-pass painter as one composer pass; exposes the paint uniforms as .uniforms so render() can drive it
-const PainterPass = T.Pass && T.Pass.FullScreenQuad && class extends T.Pass {
+// ambient occlusion, built for this pipeline: one depth-only prepass at half resolution (ghosts, particles, sky and decals left out,
+// ghost paws kept so the dogs are grounded), Alchemy-style AO (McGuire et al.) from 12 spiral samples with normals rebuilt from depth,
+// then a depth-aware blur in the composite. Occlusion is laid in as a warm umber glaze, light on Gesso and the ghosts.
+// r128's examples/js build exposes FullScreenQuad as THREE.FullScreenQuad (later builds: THREE.Pass.FullScreenQuad)
+const FSQ = T.FullScreenQuad || (T.Pass && T.Pass.FullScreenQuad);
+const AOShader = {
+  uniforms: { tDepth: { value: null }, uRes: { value: new T.Vector2(1, 1) }, uNear: { value: 0.1 }, uFar: { value: 1000 }, uTanX: { value: 1 }, uTanY: { value: 1 },
+    uProjScale: { value: 1 }, uRadius: { value: 1.3 }, uIntensity: { value: 2.6 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    #include <packing>
+    uniform sampler2D tDepth; uniform vec2 uRes; uniform float uNear, uFar, uTanX, uTanY, uProjScale, uRadius, uIntensity; varying vec2 vUv;
+    float vz(vec2 uv){ return perspectiveDepthToViewZ(texture2D(tDepth, uv).x, uNear, uFar); }
+    vec3 vpos(vec2 uv, float z){ vec2 n = uv * 2.0 - 1.0; return vec3(n.x * uTanX * -z, n.y * uTanY * -z, z); }
+    void main(){
+      float d0 = texture2D(tDepth, vUv).x;
+      if (d0 >= 0.99999) { gl_FragColor = vec4(1.0); return; }
+      float z = perspectiveDepthToViewZ(d0, uNear, uFar); vec3 p = vpos(vUv, z);
+      vec2 tx = 1.0 / uRes;
+      // normal from the flatter neighbour on each axis, so silhouettes don't smear
+      vec2 ul = vUv - vec2(tx.x, 0.0), ur = vUv + vec2(tx.x, 0.0), ud = vUv - vec2(0.0, tx.y), uu = vUv + vec2(0.0, tx.y);
+      vec3 pl = vpos(ul, vz(ul)), pr = vpos(ur, vz(ur)), pd = vpos(ud, vz(ud)), pu = vpos(uu, vz(uu));
+      vec3 dx = abs(pr.z - p.z) < abs(p.z - pl.z) ? pr - p : p - pl;
+      vec3 dy = abs(pu.z - p.z) < abs(p.z - pd.z) ? pu - p : p - pd;
+      vec3 n = normalize(cross(dx, dy));
+      float rUV = clamp(uRadius * uProjScale / -z, 2.5 * tx.y, 0.12);
+      float ign = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));   // interleaved gradient noise
+      float asp = uRes.y / uRes.x, sum = 0.0, r2 = uRadius * uRadius;
+      for (int i = 0; i < 12; i++) {
+        float fi = float(i) + 0.5, a = fi * 2.39996 + ign * 6.2832, rr = sqrt(fi / 12.0) * rUV;
+        vec2 suv = vUv + vec2(cos(a) * asp, sin(a)) * rr;
+        vec3 v = vpos(suv, vz(suv)) - p; float d2 = dot(v, v);
+        sum += max(0.0, dot(n, v) - 0.002 * -z) / (d2 + 0.02) * max(0.0, 1.0 - d2 / r2);
+      }
+      float ao = clamp(1.0 - uIntensity * sum / 12.0, 0.0, 1.0);
+      gl_FragColor = vec4(vec3(mix(ao, 1.0, smoothstep(45.0, 90.0, -z))), 1.0);
+    }`,
+};
+const AOCompShader = {
+  uniforms: { tDiffuse: { value: null }, tAO: { value: null }, tDepth: { value: null }, tMask: { value: null }, uTexel: { value: new T.Vector2(1, 1) },
+    uNear: { value: 0.1 }, uFar: { value: 1000 }, uK: { value: 0.85 }, uMaskOn: { value: 0 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    #include <packing>
+    uniform sampler2D tDiffuse, tAO, tDepth, tMask; uniform vec2 uTexel; uniform float uNear, uFar, uK, uMaskOn; varying vec2 vUv;
+    float lz(vec2 uv){ return perspectiveDepthToViewZ(texture2D(tDepth, uv).x, uNear, uFar); }
+    void main(){
+      vec3 col = texture2D(tDiffuse, vUv).rgb;
+      float z0 = lz(vUv), sum = 0.0, wsum = 0.0, tol = 0.04 * -z0 + 0.05;
+      for (int j = -2; j <= 2; j++) for (int i = -2; i <= 2; i++) {
+        vec2 uv = vUv + vec2(float(i), float(j)) * uTexel;
+        float w = exp(-abs(lz(uv) - z0) / tol) * (1.0 - 0.12 * float(abs(i) + abs(j)));
+        sum += texture2D(tAO, uv).r * w; wsum += w;
+      }
+      float ao = sum / max(wsum, 1e-4);
+      if (uMaskOn > 0.5) { vec4 mk = texture2D(tMask, vUv); ao = mix(ao, 1.0, max(mk.r * 0.6, mk.g * 0.85)); }
+      vec3 occ = mix(vec3(0.42, 0.34, 0.26), vec3(1.0), ao);   // a warm umber glaze, never grey dirt
+      gl_FragColor = vec4(col * mix(vec3(1.0), occ, uK), 1.0);
+    }`,
+};
+const AOPass = T.Pass && FSQ && class extends T.Pass {
+  constructor(scene, camera) {
+    super(); this.scene = scene; this.camera = camera; this.needsSwap = true;
+    const dt = new T.DepthTexture(); dt.type = T.UnsignedIntType;
+    this.zRT = new T.WebGLRenderTarget(4, 4, { minFilter: T.NearestFilter, magFilter: T.NearestFilter, depthBuffer: true, depthTexture: dt });
+    this.aoRT = new T.WebGLRenderTarget(4, 4, { minFilter: T.LinearFilter, magFilter: T.LinearFilter, depthBuffer: false });
+    this.zMat = new T.MeshBasicMaterial({ colorWrite: false });
+    this.aoMat = new T.ShaderMaterial(AOShader); this.cMat = new T.ShaderMaterial(AOCompShader);
+    this.aoQuad = new FSQ(this.aoMat); this.cQuad = new FSQ(this.cMat);
+    this.skip = []; this.vis = []; this.skipT = 0;
+  }
+  setSize(w, h) {
+    const hw = Math.max(1, w >> 1), hh = Math.max(1, h >> 1);
+    this.zRT.setSize(hw, hh); this.aoRT.setSize(hw, hh); this.aoMat.uniforms.uRes.value.set(hw, hh); this.cMat.uniforms.uTexel.value.set(1 / hw, 1 / hh);
+  }
+  render(renderer, writeBuffer, readBuffer) {
+    const sc = this.scene, cam = this.camera;
+    // every ~2 s: list what must not occlude (transparent or custom-shaded: ghosts, sky, particles, decals, beams); tagged ghost paws stay
+    if (--this.skipT <= 0) {
+      this.skipT = 45; this.skip.length = 0;
+      sc.traverse(o => {
+        if (!o.material) return;
+        if (o.isInstancedMesh && !o.instanceColor) o.instanceColor = new T.InstancedBufferAttribute(new Float32Array(o.instanceMatrix.count * 3).fill(1), 3);
+        if (o.userData.aoOccluder) return;
+        const m = Array.isArray(o.material) ? o.material[0] : o.material;
+        if (m.transparent || m.isShaderMaterial || m.blending === T.AdditiveBlending || o.isPoints || o.isLine || o.isSprite) this.skip.push(o);
+      });
+    }
+    const sk = this.skip, vis = this.vis; vis.length = sk.length;
+    for (let i = 0; i < sk.length; i++) { vis[i] = sk[i].visible; sk[i].visible = false; }
+    const bg = sc.background, ov = sc.overrideMaterial, sau = renderer.shadowMap.autoUpdate;
+    sc.background = null; sc.overrideMaterial = this.zMat; renderer.shadowMap.autoUpdate = false;   // never rebuild the shadow map for this pass
+    let ok = true;
+    try { renderer.setRenderTarget(this.zRT); renderer.clear(); renderer.render(sc, cam); }
+    catch (e) { ok = false; this.skipT = 0; }   // something new joined the scene since the last scan: rescan next frame
+    sc.overrideMaterial = ov; sc.background = bg; renderer.shadowMap.autoUpdate = sau;
+    for (let i = 0; i < sk.length; i++) sk[i].visible = vis[i];
+    if (!ok) { this.cMat.uniforms.uK.value = 0; } else this.cMat.uniforms.uK.value = 0.85;
+    const ty = Math.tan(cam.fov * Math.PI / 360), u = this.aoMat.uniforms, c = this.cMat.uniforms;
+    u.tDepth.value = this.zRT.depthTexture; u.uNear.value = cam.near; u.uFar.value = cam.far; u.uTanY.value = ty; u.uTanX.value = ty * cam.aspect; u.uProjScale.value = 0.5 / ty;
+    renderer.setRenderTarget(this.aoRT); this.aoQuad.render(renderer);
+    c.tDiffuse.value = readBuffer.texture; c.tAO.value = this.aoRT.texture; c.tDepth.value = this.zRT.depthTexture; c.uNear.value = cam.near; c.uFar.value = cam.far;
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer); this.cQuad.render(renderer);
+  }
+};
+const PainterPass = T.Pass && FSQ && class extends T.Pass {
   constructor() {
     super();
     this.rtT = new T.WebGLRenderTarget(4, 4, { type: T.HalfFloatType, format: T.RGBAFormat, minFilter: T.LinearFilter, magFilter: T.LinearFilter, depthBuffer: false });
     this.tMat = new T.ShaderMaterial(TensorShader); this.pMat = new T.ShaderMaterial(PaintShader);
     this.tMat.uniforms.uTexel = this.pMat.uniforms.uTexel; this.uniforms = this.pMat.uniforms;
-    this.tQuad = new T.Pass.FullScreenQuad(this.tMat); this.pQuad = new T.Pass.FullScreenQuad(this.pMat);
+    this.tQuad = new FSQ(this.tMat); this.pQuad = new FSQ(this.pMat);
   }
   setSize(w, h) { this.rtT.setSize(w, h); }
   render(renderer, writeBuffer, readBuffer) {
@@ -670,6 +778,7 @@ if (HAS_POST) {
     const rt = renderer.capabilities.isWebGL2 && T.WebGLMultisampleRenderTarget ? Object.assign(new T.WebGLMultisampleRenderTarget(4, 4, rto), { samples: 4 }) : new T.WebGLRenderTarget(4, 4, rto);
     composer = new T.EffectComposer(renderer, rt);
     composer.addPass(new T.RenderPass(scene, camera));
+    if (AOPass && (renderer.capabilities.isWebGL2 || renderer.extensions.get('WEBGL_depth_texture'))) { aoPass = new AOPass(scene, camera); composer.addPass(aoPass); }
     if (T.BokehPass) { bokeh = new T.BokehPass(scene, camera, { focus: 4, aperture: 0.0009, maxblur: 0.0065, width: 4, height: 4 }); bokeh.enabled = false; bokeh.needsSwap = true; bokeh.setSize = function (w, h) { this.renderTargetDepth.setSize(w, h); }; composer.addPass(bokeh); }
     shaftPass = new T.ShaderPass(ShaftShader); composer.addPass(shaftPass);
     bloom = new T.UnrealBloomPass(new T.Vector2(256, 256), 0.55, 0.55, 1.5); composer.addPass(bloom);
@@ -681,8 +790,8 @@ if (HAS_POST) {
     MASK_R = new T.MeshBasicMaterial({ color: 0xff0000, fog: false, side: T.DoubleSide, toneMapped: false, depthTest: true, depthWrite: false });
     MASK_G = new T.MeshBasicMaterial({ color: 0x00ff00, fog: false, side: T.DoubleSide, toneMapped: false, blending: T.AdditiveBlending, depthTest: true, depthWrite: false });
     MASK_Z = new T.MeshBasicMaterial({ colorWrite: false, depthWrite: true, depthTest: true, fog: false });  // terrain depth only, so subjects behind hills stay out of the mask
-    finalPass.uniforms.tMask.value = maskRT.texture; paintPass.uniforms.tMask.value = maskRT.texture;
-  } catch (e) { composer = null; maskRT = null; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.outputEncoding = T.sRGBEncoding; }
+    finalPass.uniforms.tMask.value = maskRT.texture; paintPass.uniforms.tMask.value = maskRT.texture; if (aoPass) aoPass.cMat.uniforms.tMask.value = maskRT.texture;
+  } catch (e) { console.warn('Post-processing disabled:', e); composer = null; maskRT = null; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.outputEncoding = T.sRGBEncoding; }
 }
 
 // ================================================================= colliders
@@ -1477,8 +1586,8 @@ function buildDog(tint, o = {}) {
     const kn = new T.Group(); kn.position.y = -0.27 * legK; hip.add(kn);
     ghost(legShell(0.27 * legK, r1, r2, seed * 13 + li, false), pmL, kn, shL);
     let pg = null;
-    if (pawGeo) { pg = new T.Group(); pg.position.set(0, -0.27 * legK, 0.02); kn.add(pg); ghost(pawGeo, pmL, pg, shL); }
-    else if (!echo) { const pp = new T.Group(); pp.position.set(0, -0.27 * legK + 0.004, 0.018); pp.scale.set(0.062, 0.034, 0.085); kn.add(pp); ghost(ghostAttrs(facetGeo(new T.SphereGeometry(0.5, 9, 6), 0.05, seed + li), tc.clone().lerp(C('#efe4cc'), 0.45), 1.0), pmL, pp, shL); }
+    if (pawGeo) { pg = new T.Group(); pg.position.set(0, -0.27 * legK, 0.02); kn.add(pg); ghost(pawGeo, pmL, pg, shL); if (!echo) pg.traverse(o => { o.userData.aoOccluder = true; }); }
+    else if (!echo) { const pp = new T.Group(); pp.position.set(0, -0.27 * legK + 0.004, 0.018); pp.scale.set(0.062, 0.034, 0.085); kn.add(pp); ghost(ghostAttrs(facetGeo(new T.SphereGeometry(0.5, 9, 6), 0.05, seed + li), tc.clone().lerp(C('#efe4cc'), 0.45), 1.0), pmL, pp, shL); pp.traverse(o => { o.userData.aoOccluder = true; }); }
     legs.push({ hip, kn, back, ph, gph, x: lx, paw: pg });
   });
   // tail: caudal vertebrae tapering away
@@ -2206,7 +2315,7 @@ function buildActors() {
   W.trailMesh.frustumCulled = false; scene.add(W.trailMesh);
   // pawprints, sparks and motes
   W.paws = new T.InstancedMesh(new T.PlaneGeometry(0.34, 0.34).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ map: pawTex, blending: T.AdditiveBlending, transparent: true, depthWrite: false }), 260);
-  W.paws.frustumCulled = false; W.paws.count = 260;
+  W.paws.frustumCulled = false; W.paws.count = 260; W.paws.instanceColor = new T.InstancedBufferAttribute(new Float32Array(260 * 3).fill(1), 3);   // see instanced()
   for (let i = 0; i < 260; i++) { _m4.makeTranslation(0, -999, 0); W.paws.setMatrixAt(i, _m4); W.paws.setColorAt(i, new T.Color(0, 0, 0)); }
   scene.add(W.paws); W.pawList = []; W.pawNext = 0;
   const NP = 900, pg = new T.BufferGeometry();
@@ -3106,6 +3215,7 @@ function render(dt) {
       const k = quality === 'high' && !hero ? front * low * 1.6 : 0; shaftPass.enabled = k > 0.01; shaftPass.uniforms.uK.value = k;
       shaftPass.uniforms.uSun.value.set(_shV.x * 0.5 + 0.5, _shV.y * 0.5 + 0.5); shaftPass.uniforms.uCol.value.copy(sv.sun).lerp(_shC.setRGB(1, 0.8, 0.55), 0.4);
     }
+    if (aoPass) { aoPass.enabled = quality === 'high' && !stageOn; aoPass.cMat.uniforms.uMaskOn.value = maskOn ? 1 : 0; }
     paintPass.enabled = quality === 'high'; paintPass.uniforms.uMaskOn.value = maskOn ? 1 : 0; paintPass.uniforms.uK.value = hero ? 0.55 : 1;
     if (maskOn) {
       // one world-matrix update shared by the mask passes and the composer passes
