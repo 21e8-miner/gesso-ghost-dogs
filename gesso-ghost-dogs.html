@@ -1299,42 +1299,84 @@ function buildDog(tint, o = {}) {
   return { root, sit, body, head, neck, legs, tail, seat, gm, gmS: pm, gmH: pmH, gmL: pmL, lm: null, legK, headY0: head.position.y, neckX0: neck.rotation.x, echoA: pm.uniforms.uAlpha,
     steed, top, Z0, LEN, prof, pawH, sitY0, bodyBase: body.scale.clone(), shT, shL, poseOverride: null, headExtra: 0, lookMode: '' };
 }
-const GALLOP = [0, 0.55, 3.4, 3.95];
-// D.poseOverride = { a1[4], a2[4], plant[4]?, drop?, neck?, head? } replaces the leg and neck angles (planted legs solve a2 to reach the ground)
+// quadruped locomotion: footfall tables per gait (legs 0 LF, 1 RF, 2 LH, 3 RH), duty factors, stride frequency from speed
+// a leg is in stance for the first `duty` of its cycle: its foot slides back under the hip at exactly the ground speed, so it stays planted;
+// then it swings forward on an early-peaking arc. Two-bone IK poses hip (a1, + = leg forward) and knee (a2, + = lower leg folds back).
+const GAITS = {
+  walk: { off: [0.25, 0.75, 0, 0.5], duty: 0.66 },
+  trot: { off: [0, 0.5, 0.5, 0], duty: 0.47 },
+  gallop: { off: [0.5, 0.42, 0, 0.1], duty: 0.36 },       // rotary gallop (dogs)
+  hgallop: { off: [0.4, 0.5, 0, 0.1], duty: 0.33 },       // transverse gallop (steed)
+};
+function legWorldLen(D) { return 0.54 * D.legK * D.root.scale.y * D.bodyBase.y; }
+function gaitMix(D, v) {
+  const L = legWorldLen(D), vn = v / Math.sqrt(9.8 * L);
+  const wG = smooth(clamp((vn - (D.steed ? 1.5 : 1.7)) / 0.5, 0, 1)), wT = smooth(clamp((vn - 0.4) / 0.25, 0, 1)) * (1 - wG);
+  return { L, vn, wW: 1 - wT - wG, wT, wG };
+}
+// stride frequency in Hz (Froude-scaled), shared by the phase integrators and poseDog
+function gaitFreq(D, v) { const L = legWorldLen(D), vn = v / Math.sqrt(9.8 * L); return Math.sqrt(9.8 / L) / TAU * (D.steed ? 2.4 + 0.5 * vn : 2.0 + 0.9 * vn); }
+const _gaitOff = [0, 0, 0, 0];
 function poseDog(D, d, t) {
-  const amp = clamp(d.spd / 6, 0, 1.25), gp = d.gait, sit = d.sit, po = D.poseOverride;
-  const gal = D.steed ? 0 : smooth(clamp((amp - 0.75) / 0.35, 0, 1)), G2 = D.steed ? smooth(clamp((d.spd - 1.8) / 3, 0, 1)) : 0;
-  // breathe through the chest instead of floating the whole rig; the sit height follows body.scale.y so the paws stay planted
+  const v = d.v != null ? d.v : d.spd, gp = d.gait, sit = d.sit, po = D.poseOverride;
+  const amp = clamp(d.spd / 6, 0, 1.25);
   const bb = D.bodyBase, bs = 1 + 0.014 * Math.sin(t * 1.4 + d.seed * 9), by = bb.y * (1 + 0.6 * (bs - 1));
   D.body.scale.set(bb.x * bs, by, bb.z);
   const drop = po ? (po.drop || 0) : 0;
-  D.sit.rotation.x = po ? 0 : -0.45 * sit + Math.sin(gp + 0.3) * 0.08 * gal - Math.sin(gp + 1.2) * 0.1 * G2;
-  D.sit.position.y = D.sitY0 * by / bb.y - drop * by - 0.12 * sit + d.hop + Math.abs(Math.sin(gp)) * 0.035 * gal + Math.max(0, Math.sin(gp + 0.6)) * 0.06 * G2;
-  D.legs.forEach((L, li) => {
-    if (po) {
+  const up = 0.27 * D.legK, lo = 0.27 * D.legK, Ls = up + lo;
+  if (po) {
+    D.sit.rotation.set(0, 0, 0); D.sit.position.y = D.sitY0 * by / bb.y - drop * by;
+    D.legs.forEach((L, li) => {
       let a1 = po.a1[li], a2 = po.a2[li];
-      if (po.plant && po.plant[li]) { const l = 0.27 * D.legK, c = clamp((0.54 * D.legK - drop) / l - Math.cos(a1), -1, 1); a2 = a1 + Math.acos(c); }
-      L.hip.rotation.x = -a1; L.kn.rotation.x = a2; if (L.paw) L.paw.rotation.x = po.plant && po.plant[li] ? a1 - a2 : 0; return;
-    }
-    const ph = lerp(L.ph, L.gph, gal), s = Math.sin(gp + ph);
-    let a1 = s * (0.6 + 0.25 * gal) * amp, a2 = (L.back ? 0.38 : 0.28) * amp * Math.max(0, -Math.cos(gp + ph));
-    if (L.back) { a1 += 0.2; a2 += 0.35; a1 = lerp(a1, 1.25, sit); a2 = lerp(a2, 1.9, sit); }
-    else { a1 -= 0.45 * sit; }
-    if (G2 > 0) {
-      const c = gp + GALLOP[li], sw = Math.sin(c), fold = Math.max(0, Math.cos(c));
-      const b1 = L.back ? 0.25 + sw * 0.78 : sw * 0.88, b2 = L.back ? 0.3 + 1.0 * fold : 1.4 * Math.pow(fold, 1.3);
-      a1 = lerp(a1, b1, G2); a2 = lerp(a2, b2, G2);
-    }
-    L.hip.rotation.x = -a1; L.kn.rotation.x = a2; if (L.paw) L.paw.rotation.x = 0;
-  });
-  D.body.rotation.x = po ? 0 : Math.sin(gp * 2 + 0.4) * 0.025 * amp * (1 - gal) * (1 - G2);
-  const pump = po ? 0 : Math.sin(gp + 0.9) * G2;
-  if (D.neck) D.neck.rotation.x = po && po.neck != null ? po.neck : D.neckX0 + pump * 0.1;
-  D.head.position.y = D.headY0 + Math.sin(gp * 2) * 0.012 * amp * (1 - G2) - pump * 0.02;
-  D.head.rotation.set((d.sniff ? 0.55 + Math.sin(t * 7 + d.seed) * 0.12 : 0) - d.howl * 0.75 + (d.state === 'lost' ? 0.4 : 0) + 0.45 * sit - 0.12 * gal - pump * 0.14
+      if (po.plant && po.plant[li]) { const c = clamp((Ls - drop) / up - Math.cos(a1), -1, 1); a2 = a1 + Math.acos(c); }
+      L.hip.rotation.x = -a1; L.kn.rotation.x = a2; if (L.paw) L.paw.rotation.x = po.plant && po.plant[li] ? a1 - a2 : 0;
+    });
+    D.body.rotation.x = 0;
+    if (D.neck) D.neck.rotation.x = po.neck != null ? po.neck : D.neckX0;
+    D.head.position.y = D.headY0;
+  } else {
+    const gm = gaitMix(D, v), f = gaitFreq(D, v), moving = smooth(clamp(v / 0.3, 0, 1));
+    const A = GAITS.walk, B = GAITS.trot, Cg = D.steed ? GAITS.hgallop : GAITS.gallop;
+    const duty = A.duty * gm.wW + B.duty * gm.wT + Cg.duty * gm.wG;
+    for (let k = 0; k < 4; k++) _gaitOff[k] = A.off[k] * gm.wW + B.off[k] * gm.wT + Cg.off[k] * gm.wG;
+    const rs = D.root.scale.z * bb.z, ry = D.root.scale.y * by;
+    const sw = Math.min(v / Math.max(f, 0.01) * duty, 1.25 * gm.L) / rs * moving;    // stance sweep, body-local
+    const cyc = gp / TAU;
+    // body: crouch a little so the knees never lock; trot bobs twice a stride, the walk rolls, the gallop flexes the spine
+    const bob = Ls * moving * ((0.018 * gm.wW + 0.03 * gm.wT) * Math.cos(gp * 2) + 0.05 * gm.wG * Math.max(0, Math.sin(gp + 0.6)));
+    const pitch = gm.wG * moving * 0.09 * Math.sin(gp + (D.steed ? 0.3 : 0)) + gm.wT * moving * 0.012 * Math.sin(gp * 2);
+    D.sit.rotation.set(-0.45 * sit + pitch, 0, 0.03 * gm.wW * moving * Math.sin(gp));
+    D.sit.position.y = D.sitY0 * by / bb.y - 0.035 * Ls * by - 0.12 * sit + d.hop + bob * by;
+    const lift = Ls * (0.11 * gm.wW + 0.16 * gm.wT + 0.22 * gm.wG) * moving;
+    D.legs.forEach((L, li) => {
+      const u = ((cyc + _gaitOff[li]) % 1 + 1) % 1;
+      let fz, fy;
+      if (u < duty) { fz = sw * (0.5 - u / duty); fy = 0; }
+      else { const w = (u - duty) / (1 - duty), e = w * w * (3 - 2 * w); fz = sw * (e - 0.5); fy = lift * Math.sin(Math.PI * Math.pow(w, 0.75)); }
+      // hips sit forward/back of the body pivot; body pitch tilts the hip, so counter it to keep the foot on level ground
+      const hz = L.hip.position.z, pz = -Math.sin(pitch) * hz;
+      const depth = Ls * 0.965 + bob - pz - fy;
+      const r = Math.min(Math.hypot(fz, depth), Ls * 0.999), phi = Math.atan2(fz, depth) + pitch;
+      const bend = Math.PI - Math.acos(clamp((up * up + lo * lo - r * r) / (2 * up * lo), -1, 1));
+      const al = Math.acos(clamp((up * up + r * r - lo * lo) / (2 * up * r), -1, 1));
+      let a1, a2;
+      if (L.back) { a1 = phi + al; a2 = bend; }            // stifle forward
+      else { a1 = phi - al; a2 = -bend; }                  // elbow back
+      if (L.back) { a1 = lerp(a1, 1.25, sit); a2 = lerp(a2, 1.9, sit); } else { a1 = lerp(a1, a1 - 0.45, sit); }
+      L.hip.rotation.x = -a1; L.kn.rotation.x = a2;
+      if (L.paw) L.paw.rotation.x = u < duty || !moving ? a2 - a1 + (L.back ? 0 : 0) : (L.back ? -0.4 : 0.9) * Math.sin(Math.PI * (u - duty) / (1 - duty));
+    });
+    D.body.rotation.x = 0;
+    const pump = Math.sin(gp + 0.9) * gm.wG * moving;
+    if (D.neck) D.neck.rotation.x = D.neckX0 + pump * 0.1 - pitch * 0.6;
+    D.head.position.y = D.headY0 - bob * (gm.wT > 0.5 ? 0.9 : 0.3) - pump * 0.02;   // a trotting dog holds its head level
+  }
+  const gal = D.steed ? 0 : smooth(clamp((amp - 0.75) / 0.35, 0, 1));
+  D.head.rotation.set((d.sniff ? 0.55 + Math.sin(t * 7 + d.seed) * 0.12 : 0) - d.howl * 0.75 + (d.state === 'lost' ? 0.4 : 0) + 0.45 * sit - 0.12 * gal
     + (D.steed ? 0.12 : 0) + (po ? po.head || 0 : 0) + (D.headExtra || 0), d.look || 0, 0);
-  const wag = Math.sin(t * d.wag + d.seed * 5);
-  D.tail.forEach((tg, k) => { tg.rotation.x = (k ? -0.18 : -0.55 + 0.3 * sit) + 0.25 * gal + 0.4 * G2; tg.rotation.y = wag * (0.3 + k * 0.12) * (1 - 0.6 * G2); });
+  // tail: carried, wagging, trailing the body's pitch like a damped spring
+  const wag = Math.sin(t * d.wag + d.seed * 5), tp = D.sit.rotation.x;
+  D.tail.forEach((tg, k) => { tg.rotation.x = (k ? -0.18 : -0.55 + 0.3 * sit) + 0.25 * gal - tp * (0.6 + 0.3 * k); tg.rotation.y = wag * (0.3 + k * 0.12) * (1 - 0.6 * gal); });
 }
 
 function buildHuman(o) {
@@ -2251,7 +2293,7 @@ function updateDogs(dt) {
       if (d.printD > 0.75) { d.printD = 0; addPaw(d.x + Math.cos(d.head) * (W.pawNext % 2 ? 0.08 : -0.08), d.y + 0.04, d.z - Math.sin(d.head) * (W.pawNext % 2 ? 0.08 : -0.08), d.head); }
     }
     if (d.state !== 'point' && d.spd > 0.3) { let a = Math.atan2(d.vx, d.vz) - d.head; a = Math.atan2(Math.sin(a), Math.cos(a)); d.head += a * Math.min(1, dt * 8); }
-    d.gait += dt * d.spd * 2.4;
+    d.gait += dt * TAU * gaitFreq(d.model, d.spd);
     d.sit = lerp(d.sit, wantSit && d.spd < 0.4 ? 1 : 0, Math.min(1, dt * 4));
     { let la = Math.atan2(P.x - d.x, P.z - d.z) - d.head; la = Math.atan2(Math.sin(la), Math.cos(la)); d.look = lerp(d.look || 0, d.state === 'follow' && d.spd < 1.2 ? clamp(la, -0.9, 0.9) : 0, Math.min(1, dt * 3)); }
     d.puffT -= dt; if (d.spd > 4 && d.puffT <= 0) { d.puffT = 0.08; emit(d.x - Math.sin(d.head) * 0.6, d.y + 0.6, d.z - Math.cos(d.head) * 0.6, 1, { sp: 0.6, up: 0.6, life: 0.9, c: C(d.def.tint).multiplyScalar(1.2), s: 0.5 }); }
@@ -2404,7 +2446,7 @@ function placeActors(dt) {
   GHOSTU.uAmb.value.copy(hemi.color).multiplyScalar(hemi.intensity * 0.6).addScalar(0.06 + 0.22 * SKYV.night); GHOSTU.uGlow.value = 0.2 + 0.42 * SKYV.night; for (const m of GHOST_RIBS) m.opacity = m.userData.op0 * (1 - 0.6 * SKYV.night);
   if (ride) {
     STEED.root.visible = true; STEED.root.position.set(P.x, Math.max(P.y, WATER - 0.4), P.z); STEED.root.rotation.y = P.head;
-    STEED.d.spd = P.speed * 0.25; STEED.d.gait += dt * TAU * (0.9 + 0.055 * P.speed);
+    STEED.d.spd = P.speed * 0.25; STEED.d.v = P.speed; STEED.d.gait += dt * TAU * gaitFreq(STEED, P.speed);
     if (cover) {
       // the painting's stride: near foreleg folded under the chest and slowly pawing, the other three planted
       const po = STEED.coverPose || (STEED.coverPose = { a1: [0, 0, 0, 0], a2: [0, 0, 0, 0], plant: [true, true, true, true], drop: 0.02, neck: 0, head: 0.1 });
@@ -2420,7 +2462,7 @@ function placeActors(dt) {
     poseDog(STEED, STEED.d, S.t);
     STEED.gm.uniforms.uAlpha.value = 0.85 + SKYV.night * 0.3;
     const sp = STEED.root.position;
-    pushHist(STEED.hist, { t: S.t, x: sp.x, y: sp.y, z: sp.z, head: P.head, gait: STEED.d.gait, spd: STEED.d.spd, sit: 0, hop: 0, howl: 0, sniff: false, wag: 2, seed: 0.4, state: 'steed', look: 0 });
+    pushHist(STEED.hist, { t: S.t, x: sp.x, y: sp.y, z: sp.z, head: P.head, gait: STEED.d.gait, spd: STEED.d.spd, v: STEED.d.v, sit: 0, hop: 0, howl: 0, sniff: false, wag: 2, seed: 0.4, state: 'steed', look: 0 });
     const galF = echoOn ? clamp((P.speed - 5) / 9, 0, 1) : 0, aRest = cover ? STEED_REST_COVER : STEED_REST_RIDE;
     STEED.echoes.forEach((e, k) => {
       const restW = smooth(clamp(1 - galF / 0.5, 0, 1)), galW = smooth(clamp((galF - 0.5) / 0.3, 0, 1));
