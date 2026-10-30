@@ -171,6 +171,7 @@ body.touch #caption{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 <div id="tools">
   <button class="btn" id="bMap" type="button">Map <kbd class="lbl-long">M</kbd></button>
   <button class="btn" id="bGarb" type="button">Garb <kbd class="lbl-long">G</kbd></button>
+  <button class="btn" id="bPhoto" type="button">Photo <kbd class="lbl-long">P</kbd></button>
   <button class="btn" id="bCam" type="button">Camera: follow</button>
   <button class="btn" id="bQuality" type="button">Graphics: high</button>
   <button class="btn" id="bSound" type="button">Sound on</button>
@@ -226,6 +227,7 @@ body.touch #caption{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
       <dt><kbd>M</kbd> · <kbd>R</kbd></dt><dd>Open the map · ride, once you have earned it.</dd>
       <dt><kbd>C</kbd></dt><dd>Side camera, like a painting. Steer with left and right.</dd>
       <dt><kbd>G</kbd></dt><dd>The wardrobe: dress Gesso in ancient garb.</dd>
+      <dt><kbd>P</kbd></dt><dd>Take a plate: saves the view as a picture.</dd>
     </dl>
     </details>
     <div class="btns">
@@ -2803,20 +2805,20 @@ function resetDogs() {
 function resetAll() {
   P.x = PLAYER_START.x; P.z = PLAYER_START.z; P.vx = P.vz = 0; P.head = Math.PI; camS.yaw = 0;
   S.collected.clear(); S.marked.clear(); S.plates.clear(); S.steed = false; S.riding = false; S.clock = DAY * 0.06;
-  S.hand = false; S.bosses = 0; HAND.next = 50; INK.kills = 0; INK.seen = false; STILL.meter = 0.75; HP.v = 1; HP.down = 0; if (INK.g) inkClear(); INK.next = 45;
+  S.hand = false; S.finished = false; S.bosses = 0; HAND.next = 50; INK.kills = 0; INK.seen = false; STILL.meter = 0.75; HP.v = 1; HP.down = 0; if (INK.g) inkClear(); INK.next = 45;
   fog.fill(0); PAINT.a.fill(0); PAINT.at.fill(1e9); PAINT.dirty = true; resetDogs();
 }
 const SAVE_KEY = 'gesso-ghost-dogs-v2';
 function serialize() {
   return { v: 2, x: P.x, z: P.z, head: P.head, yaw: camS.yaw, clock: S.clock, seams: [...S.collected], marked: [...S.marked], plates: [...S.plates], steed: S.steed, riding: S.riding,
-    dogs: W.dogs.map(d => d.joined ? 1 : (d.marked ? 2 : 0)), fog: Array.from(fog).join(''), hand: S.hand ? 1 : 0, bosses: S.bosses || 0, ink: INK.kills, inkSeen: INK.seen, still: Math.round(STILL.meter * 100) / 100 };
+    dogs: W.dogs.map(d => d.joined ? 1 : (d.marked ? 2 : 0)), fog: Array.from(fog).join(''), hand: S.hand ? 1 : 0, fin: S.finished ? 1 : 0, bosses: S.bosses || 0, ink: INK.kills, inkSeen: INK.seen, still: Math.round(STILL.meter * 100) / 100 };
 }
 function applySave(s) {
   if (!s || s.v !== 2) return false;
   P.x = s.x; P.z = s.z; P.head = s.head || 0; camS.yaw = s.yaw || 0; S.clock = s.clock || 0;
   S.collected = new Set(s.seams || []); S.marked = new Set(s.marked || []); S.plates = new Set(s.plates || []);
   S.steed = !!s.steed; S.riding = !!s.riding && S.steed;
-  S.hand = !!s.hand; S.bosses = s.bosses || 0; INK.kills = s.ink || 0; INK.seen = !!s.inkSeen; STILL.meter = s.still != null ? clamp(s.still, 0, 1) : 0.75;
+  S.hand = !!s.hand; S.finished = !!s.fin; S.bosses = s.bosses || 0; INK.kills = s.ink || 0; INK.seen = !!s.inkSeen; STILL.meter = s.still != null ? clamp(s.still, 0, 1) : 0.75;
   resetDogs();
   (s.dogs || []).forEach((v, i) => { const d = W.dogs[i]; if (!d) return; if (v === 1) { d.joined = true; d.state = 'follow'; d.sit = 0; d.x = P.x - 1 + i * 0.4; d.z = P.z + 1.5; } else if (v === 2) d.marked = true; });
   if (typeof s.fog === 'string' && s.fog.length === fog.length) for (let i = 0; i < fog.length; i++) { fog[i] = s.fog.charCodeAt(i) === 49 ? 1 : 0; PAINT.a[i] = fog[i]; }
@@ -3077,7 +3079,7 @@ let toastT = 0, bannerT = 0, promptText = '';
 function syncLore() {
   const sp = document.querySelectorAll('#title .spec .eyebrow'); if (sp.length < 2) return;
   sp[0].textContent = S.plates.has(8) ? 'A wandering game in nine plates' : 'A wandering game in eight plates';
-  sp[1].textContent = S.hand ? 'Survey No. 6 · retouched' : 'Survey No. 6';
+  sp[1].textContent = S.finished ? 'Survey No. 6 · finished' : S.hand ? 'Survey No. 6 · retouched' : 'Survey No. 6';
 }
 function toast(msg, dur = 3) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); toastT = dur; }
 function banner(name, eye = 'You enter') { $('banEye').textContent = eye; $('banName').textContent = name; $('banner').classList.add('on'); bannerT = 3.6; }
@@ -3139,6 +3141,13 @@ function plateDirections(i) {
   const dir = dirs[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8], how = bd < 160 ? 'a short walk' : bd < 360 ? 'a long walk' : 'half the plain away';
   const mid = BIO[biomeAt((here.x + best.x) / 2, (here.z + best.z) / 2)].name, via = Math.hypot(best.x - here.x, best.z - here.z) > 200 ? `, by way of ${mid}` : '';
   return ` The next stone lies ${how} to the ${dir}${via}.`;
+}
+// the painting is finished: the paint floods the whole plain at once, the hand passes to sign it, the chorale rises, and ink never
+// bleeds through a finished painting again
+function finale() {
+  S.finished = true; fog.fill(1); paintFlood(55); HAND.next = 0; HAND.force = true; P.idle = 60;
+  banner('The painting is finished', 'Survey No. 6'); sfxFuse(); syncLore(); save();
+  setTimeout(() => toast('Ink does not bleed through a finished painting. The plain is yours to walk.', 6), 9000);
 }
 function sunSong() {
   // whistle the sun along: by day to the evening, by night to the next dawn, the sky running while the plain stands still
@@ -3220,6 +3229,7 @@ window.addEventListener('keydown', e => {
   else if (e.code === 'KeyE' || e.code === 'Enter') { e.preventDefault(); interact(); }
   else if (e.code === 'KeyR') toggleRide();
   else if (e.code === 'KeyC') toggleCam();
+  else if (e.code === 'KeyP') photo();
 });
 window.addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) keys[k] = false; });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; joy.active = false; look.id = null; $('joy').hidden = true; AIM.held = false; });
@@ -3290,6 +3300,14 @@ function applyQuality() {
 }
 $('bQuality').addEventListener('click', e => { e.currentTarget.blur(); quality = quality === 'high' ? 'light' : 'high'; store.set('gesso-quality', quality); perf.locked = true; applyQuality(); });
 function syncCam() { $('bCam').textContent = `Camera: ${camMode === 'profile' ? 'side' : 'follow'}`; }
+// a plate of your own: the frame as it stands, saved as a picture (the canvas is read in the same task as the render, before it clears)
+function photo() {
+  if (!S.ready || !S.started) return;
+  S.photos = (S.photos || 0) + 1; render(0);
+  const a = document.createElement('a'); a.href = cv.toDataURL('image/jpeg', 0.92); a.download = `gesso-plate-${String(S.photos).padStart(2, '0')}.jpg`; document.body.appendChild(a); a.click(); a.remove();
+  pageTurn(); toast(`Plate ${S.photos} saved.`, 2.2);
+}
+$('bPhoto').addEventListener('click', e => { e.currentTarget.blur(); photo(); });
 function toggleCam() { camMode = camMode === 'profile' ? 'follow' : 'profile'; store.set('gesso-cam', camMode); syncCam(); if (camMode === 'follow') camS.yaw = P.head + Math.PI; toast(camMode === 'profile' ? 'Side camera. Steer with left and right.' : 'Follow camera.', 2.2); }
 $('bCam').addEventListener('click', e => { e.currentTarget.blur(); if (S.started) toggleCam(); });
 syncCam();
@@ -3875,7 +3893,7 @@ function updateInk(dt, rdt) {
   const live = playing(), calm = !live || cardOpen || S.cineT > 0 || HP.down > 0 || garbOpen, night = SKYV.night;
   INKU.uLit.value = lerp(1, 0.42, night); INKU.uNight.value = night; INKU.uFogD.value = scene.fog.density;
   _ikR.setFromMatrixColumn(camera.matrixWorld, 0); _ikR.y = 0; if (_ikR.lengthSq() < 1e-6) _ikR.set(1, 0, 0); _ikR.normalize();
-  if (live && !calm && !INK.list.length && P.idle < 25) inkDirector(dt, night);
+  if (live && !calm && !INK.list.length && P.idle < 25 && !S.finished) inkDirector(dt, night);
   updateWraiths(dt, calm, night); updateShots(dt); updateBlots(dt); updateInkParts(dt); updateStains(dt);
   AIM.k = lerp(AIM.k, (AIM.held || STILL.on || STILL.volley.length > 0 || INK.shots.some(s => s.home)) && live && HP.down <= 0 && !cardOpen ? 1 : 0, Math.min(1, rdt * 9));
   if (AIM.k < 0.5 && camS.pitch < -0.05) camS.pitch = lerp(camS.pitch, -0.05, Math.min(1, rdt * 4));
@@ -4036,8 +4054,8 @@ function updateHand(dt, rdt) {
   const m = HAND.mesh;
   if (!HAND.on) {
     if (!playing() || SKYV.night > 0.6 || INK.list.length || cardOpen || S.cineT > 0) return;
-    if (P.idle < 45) return;
-    HAND.next -= dt; if (HAND.next > 0) return;
+    if (P.idle < 45 && !HAND.force) return;
+    HAND.next -= dt; if (HAND.next > 0) return; HAND.force = false;
     HAND.next = S.hand ? 240 + Math.random() * 300 : 1e9; HAND.on = true; HAND.t = 0; S.hand = true; syncLore();
     const a = Math.random() * TAU; HAND.dx = Math.cos(a); HAND.dz = Math.sin(a);
     HAND.x0 = P.x - HAND.dx * 48 + (Math.random() - 0.5) * 10; HAND.z0 = P.z - HAND.dz * 48 + (Math.random() - 0.5) * 10; HAND.strokeD = 0;
@@ -4271,6 +4289,7 @@ function update(rdt) {
   updatePaint(dt);
   biomeCheck -= dt;
   if (biomeCheck <= 0 && playing()) {
+    if (!S.finished && S.plates.size >= 9 && S.collected.size >= W.relics.length && !cardOpen) finale();
     biomeCheck = 0.5; const b = biomeAt(P.x, P.z);
     if (b !== biomeCand) { biomeCand = b; biomeHold = 0; } else biomeHold += 0.5;
     if (biomeCand !== curBiome && biomeHold >= 1.5) { curBiome = biomeCand; banner(BIO[curBiome].name); }
