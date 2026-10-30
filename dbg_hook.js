@@ -1,1 +1,12 @@
-const SAVE_KEY = 'dbg' + Math.random(); window.__dbg = { S, P, W, camS, get G(){ return G; }, get STEED(){ return STEED; }, step(dt){ update(dt); render(dt); }, cine(d, m){ cineStart(d, m); }, scene, camera, renderer, T, get ao(){ return aoPass; }, get composer(){ return composer; }, musicWav: (s, sc) => renderMusicWav(s, sc), shot(name){ return fetch('http://127.0.0.1:8804/', { method: 'POST', body: name + '|' + renderer.domElement.toDataURL('image/jpeg', 0.9) }).then(r => r.text()); } };
+const SAVE_KEY = 'dbg' + Math.random(); window.__dbg = { S, P, W, camS, get G(){ return G; }, get STEED(){ return STEED; }, step(dt){ update(dt); render(dt); }, cine(d, m){ cineStart(d, m); }, plate(i){ readPlate(i); }, closeCard(){ hideCard(); }, scene, camera, renderer, T, get ao(){ return aoPass; }, get composer(){ return composer; }, musicWav: (s, sc) => renderMusicWav(s, sc), shot(name){ return fetch('http://127.0.0.1:8804/', { method: 'POST', body: name + '|' + renderer.domElement.toDataURL('image/jpeg', 0.9) }).then(r => r.text()); } , async sfxWav(name, secs = 4) {
+  const sr = 48000, ctx = new OfflineAudioContext(2, sr * secs, sr), keep = [AC, master, SCORE_E, muted];
+  AC = ctx; muted = false; master = ctx.createGain(); master.gain.value = 0.75; master.connect(ctx.destination);
+  SCORE_E = await buildScore(ctx, master, { players: 2 }); SCORE_E.horizon = 1e9;
+  ({ chime: () => sfxChime(3), chime2: () => { sfxChime(1); }, plate: () => pageTurn(), whistle: () => sfxWhistle(), yip: () => sfxYip(), howl: () => sfxHowl(P.x + 6, P.z), fuse: () => sfxFuse() })[name]();
+  const buf = await ctx.startRendering(); [AC, master, SCORE_E, muted] = keep;
+  const n = buf.length, L = buf.getChannelData(0), R = buf.getChannelData(1), dv = new DataView(new ArrayBuffer(44 + n * 4)), ws = (o, t) => { for (let i = 0; i < t.length; i++) dv.setUint8(o + i, t.charCodeAt(i)); };
+  ws(0, 'RIFF'); dv.setUint32(4, 36 + n * 4, true); ws(8, 'WAVEfmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 2, true); dv.setUint32(24, sr, true); dv.setUint32(28, sr * 4, true); dv.setUint16(32, 4, true); dv.setUint16(34, 16, true); ws(36, 'data'); dv.setUint32(40, n * 4, true);
+  for (let i = 0; i < n; i++) { dv.setInt16(44 + i * 4, Math.max(-1, Math.min(1, L[i])) * 32767, true); dv.setInt16(46 + i * 4, Math.max(-1, Math.min(1, R[i])) * 32767, true); }
+  const b = new Uint8Array(dv.buffer); let bin = ''; for (let i = 0; i < b.length; i += 32768) bin += String.fromCharCode.apply(null, b.subarray(i, i + 32768));
+  return 'data:audio/wav;base64,' + btoa(bin);
+} };

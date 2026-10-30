@@ -48,6 +48,13 @@ kbd{font-family:var(--ui);font-weight:700;font-size:.78em;padding:1px 5px;border
 #caption h2{font-family:var(--display);font-style:italic;font-weight:400;font-size:28px;line-height:1.1;margin:6px 0 8px;text-wrap:balance}
 #caption p{font-family:var(--display);font-size:17px;line-height:1.45;margin:0;color:#3b3427}
 #caption .dismiss{margin-top:10px;font-size:13px;color:var(--ink-soft)}
+/* reading a plate opens a spread: the tableau on the left page, the plate's text set on the facing page like the title */
+#caption.spread{left:auto;right:max(3.2vw,env(safe-area-inset-right,0px));top:max(9vh,env(safe-area-inset-top,0px));bottom:auto;transform:none;width:min(29vw,430px);background:none;border:0;box-shadow:none;padding:6px 4px;animation:pagein .9s ease-out}
+#caption.spread h2{font-size:clamp(30px,3vw,52px);font-style:normal;margin:8px 0 12px}
+#caption.spread p{font-size:clamp(15px,1.15vw,19px);color:#2f2a20}
+@keyframes pagein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+body.spreading #hud,body.spreading #tools,body.spreading #touch,body.spreading #prompt,body.spreading #banner,body.spreading #toast{visibility:hidden}
+@media (max-width:899px){ #caption.spread{left:0;right:0;top:auto;bottom:0;width:100%;background:rgba(236,227,202,.95);border-top:3px solid var(--signal);padding:14px 18px calc(16px + env(safe-area-inset-bottom,0px))} #caption.spread h2{font-size:clamp(26px,7vw,36px)} }
 
 #title{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,rgba(20,16,10,.1),rgba(14,11,7,.7));padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));overflow:auto;box-sizing:border-box}
 .titlecard{width:min(560px,100%);background:var(--paper);border:1px solid var(--rule);border-top:4px solid var(--signal);padding:24px 28px 22px;box-sizing:border-box;box-shadow:0 24px 60px rgba(8,6,3,.6);position:relative}
@@ -913,8 +920,8 @@ function headGeo() {
     if (Y > 0.02 && z > 0) X *= 1 - 0.06 * smooth(clamp((Y - 0.02) / 0.08, 0, 1));
     // the face as a plaster cast of a skull: a memento mori in the painting's mannequin language
     let F = base(Y) - 4.2 * X * X, sock = 0;
-    F += 0.006 * gs(Y, 0.034, 0.008) * gs(X, 0, 0.055);                  // brow ridge over the orbits
-    F += 0.004 * gs(Y, 0.012, 0.012) * gs(X, 0, 0.007);                  // nasal bones between them
+    F += 0.009 * gs(Y, 0.034, 0.008) * gs(X, 0, 0.055);                  // brow ridge over the orbits
+    F += 0.007 * gs(Y, 0.01, 0.013) * gs(X, 0, 0.007);                   // nasal bones between them
     for (const sx of [-1, 1]) {
       const ox = (X - sx * 0.031) / 0.0185, oy = (Y - 0.012) / 0.0165, rr = Math.sqrt(ox * ox + oy * oy);
       const hole = 1 - smooth(clamp((rr - 0.55) / 0.5, 0, 1));          // a deep round orbit, 1 inside, 0 at the rim
@@ -927,12 +934,12 @@ function headGeo() {
       const hole = gs(Y, -0.027, 0.013) * gs(X, 0, lerp(0.005, 0.012, smooth(clamp((-0.018 - Y) / 0.022, 0, 1))));
       F -= 0.015 * hole; sock = Math.max(sock, hole * 0.95);
     }
-    F += 0.004 * gs(Y, -0.06, 0.012) * gs(X, 0, 0.03);                   // the teeth sit forward on the jaw
+    F += 0.006 * gs(Y, -0.06, 0.012) * gs(X, 0, 0.03);                   // the teeth sit forward on the jaw
     const bite = gs(Y, -0.062, 0.0022) * gs(X, 0, 0.026);
     const gaps = Math.pow(0.5 + 0.5 * Math.cos(X / 0.009 * TAU), 3) * gs(Y, -0.062, 0.009) * gs(X, 0, 0.024);
     F -= 0.003 * bite + 0.0018 * gaps;   // bite line and the gaps between teeth
     sock = Math.max(sock, 0.85 * bite, 0.55 * gaps);
-    F += 0.008 * gs(Y, -0.088, 0.012) * gs(X, 0, 0.038);                 // chin
+    F += 0.011 * gs(Y, -0.088, 0.012) * gs(X, 0, 0.038);                 // chin
     // jaw shelf: a level underside from chin to neck, full only at the back where the neck enters
     if (Y < -0.07) { const fz = smooth(clamp((z + 0.15) / 0.6, 0, 1)); Y = Math.max(Y, lerp(-0.125, -0.09, fz)); }
     const w = smooth(clamp((z - 0.12) / 0.42, 0, 1)) * (1 - smooth(clamp((Math.abs(X) - 0.048) / 0.03, 0, 1)));
@@ -2690,7 +2697,7 @@ async function buildScore(ctx, dest, o = {}) {
   const far = ctx.createBiquadFilter(), farG = ctx.createGain(); far.type = 'lowpass'; far.frequency.value = 1100; farG.gain.value = 0.7; far.connect(farG); farG.connect(hall);   // in der Ferne: only the hall hears it
   const noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate); { const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
   const rnd = mulberry32(o.seed || 2026);
-  const E = { ctx, bus, hiIn: body(false), loIn: body(true), far, noise, waveHi: stringWave(ctx, false), waveLo: stringWave(ctx, true),
+  const E = { ctx, bus, hall, hiIn: body(false), loIn: body(true), far, noise, waveHi: stringWave(ctx, false), waveLo: stringWave(ctx, true),
     horizon: ctx.currentTime + 0.4, chord: [37, 53, 56, 61], half: 0, mood: o.mood || 'title', pending: null, players: o.players || 2, last: 64 };
   // one phrase = four chords, voice-led with common tones tied, a hairpin, a texture (full, sparse or a lone cello), maybe far away
   E.phrase = () => {
@@ -2788,14 +2795,69 @@ function whoosh(vol) {
 }
 const _cr = new T.Vector3();
 function panOf(x, z) { _cr.set(Math.cos(camS.yaw), 0, -Math.sin(camS.yaw)); return clamp(((x - P.x) * _cr.x + (z - P.z) * _cr.z) / 25, -1, 1); }
+// ---- sounds from the score's world: plucked cello in the current chord, paper, breath and airy voices, all in the same hall
+// (before the score exists, or if audio is limited, the old tones stand in)
 const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
-function sfxChime(i) { const f = 392 * Math.pow(2, PENTA[i % PENTA.length] / 12); tone('sine', f, f, 1.8, 0.15, { att: 0.005 }); tone('sine', f * 2.76, f * 2.76, 0.9, 0.035, { att: 0.005 }); tone('triangle', f / 2, f / 2, 1.3, 0.05, { att: 0.01 }); }
-function sfxHowl(x, z) { const pan = panOf(x, z); tone('sine', 380, 560, 1.9, 0.085, { f2: 440, att: 0.35, vib: 5.5, vibD: 9, lp: 1400, pan }); tone('sine', 384, 566, 1.9, 0.04, { f2: 446, att: 0.4, vib: 5, vibD: 7, lp: 1100, pan }); }
-function sfxWhine(x, z, vol) { tone('sine', 720, 930, 0.9, vol, { f2: 640, att: 0.1, vib: 7, vibD: 16, lp: 2000, pan: panOf(x, z) }); }
-function sfxWhistle() { tone('sine', 1150, 1900, 0.55, 0.06, { f2: 1500, att: 0.03, vib: 6, vibD: 18 }); }
-function sfxYip() { tone('triangle', 760, 1100, 0.12, 0.05, { att: 0.005, lp: 2600 }); tone('triangle', 820, 1220, 0.12, 0.045, { delay: 0.15, att: 0.005, lp: 2600 }); }
-function sfxPlate() { if (SCORE_E) SCORE_E.event('plate'); [294, 440, 587].forEach((f, i) => tone('sine', f, f, 2.6, 0.05, { att: 0.25, delay: i * 0.12 })); }
-function sfxFuse() { if (SCORE_E) SCORE_E.event('fuse'); [196, 247, 294, 392, 494].forEach((f, i) => tone('sine', f, f, 4.5, 0.07, { att: 1.1, delay: i * 0.22 })); }
+function sendHall(node, amt) { if (SCORE_E && amt > 0) { const g = AC.createGain(); g.gain.value = amt; node.connect(g); g.connect(SCORE_E.hall); } }
+function pluck(midi, vel, pan = 0, delay = 0) {
+  const E = SCORE_E; if (!E || !AC || muted) return false;
+  const t = AC.currentTime + 0.02 + delay, o = AC.createOscillator(), lp = AC.createBiquadFilter(), g = AC.createGain();
+  o.setPeriodicWave(E.waveHi); o.frequency.value = mtof(midi);
+  lp.type = 'lowpass'; lp.frequency.setValueAtTime(4200, t); lp.frequency.exponentialRampToValueAtTime(480, t + 0.7);   // the string's brightness dies first
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vel, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+  o.connect(lp); lp.connect(g);
+  if (AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); g.connect(p); p.connect(E.hiIn); } else g.connect(E.hiIn);
+  o.start(t); o.stop(t + 1.9); return true;
+}
+function breath(f0, f1, f2, dur, vol, q, pan = 0, hall = 0.3, delay = 0) {
+  // filtered breath that follows a pitch: the air in a whistle, the hollow of a ghost's howl
+  if (!AC || muted || !SCORE_E) return;
+  const t = AC.currentTime + 0.02 + delay, s = AC.createBufferSource(), bp = AC.createBiquadFilter(), g = AC.createGain();
+  s.buffer = SCORE_E.noise; s.loop = true; bp.type = 'bandpass'; bp.Q.value = q;
+  bp.frequency.setValueAtTime(f0, t); bp.frequency.linearRampToValueAtTime(f1, t + dur * 0.4); bp.frequency.linearRampToValueAtTime(f2, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.2); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(bp); bp.connect(g);
+  let out = g; if (AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); g.connect(p); out = p; }
+  out.connect(master); sendHall(out, hall); s.start(t, Math.random()); s.stop(t + dur + 0.05);
+}
+function sfxChime(i) {
+  // a seam: two plucked cello notes from the chord the score is holding, the second an octave up, like a harp in the pit
+  const ch = SCORE_E && SCORE_E.chord;
+  if (ch && pluck(ch[1 + (i % 3)] + 12, 0.42, -0.1)) { pluck(ch[1 + ((i + 1) % 3)] + 24, 0.16, 0.15, 0.11); return; }
+  const f = 392 * Math.pow(2, PENTA[i % PENTA.length] / 12); tone('sine', f, f, 1.8, 0.15, { att: 0.005 }); tone('triangle', f / 2, f / 2, 1.3, 0.05, { att: 0.01 });
+}
+function sfxHowl(x, z) {
+  // a ghost dog's howl: a voice made mostly of air, from far off
+  const pan = panOf(x, z); tone('sine', 380, 560, 1.9, 0.05, { f2: 440, att: 0.35, vib: 5.5, vibD: 9, lp: 1300, pan });
+  breath(380, 560, 440, 2.1, 0.09, 9, pan, 0.6);
+}
+function sfxWhine(x, z, vol) { tone('sine', 720, 930, 0.9, vol * 0.7, { f2: 640, att: 0.1, vib: 7, vibD: 16, lp: 1800, pan: panOf(x, z) }); breath(720, 930, 640, 0.9, vol * 0.8, 10, panOf(x, z), 0.3); }
+function sfxWhistle() { tone('sine', 1150, 1900, 0.55, 0.045, { f2: 1500, att: 0.03, vib: 6, vibD: 18 }); breath(1150, 1900, 1500, 0.6, 0.05, 14, 0, 0.25); }
+function sfxYip() {
+  // two airy yips, more breath than bark
+  tone('triangle', 760, 1100, 0.12, 0.045, { att: 0.005, lp: 2200 }); breath(800, 1250, 1000, 0.16, 0.16, 6, 0, 0.3);
+  tone('triangle', 820, 1220, 0.12, 0.04, { delay: 0.15, att: 0.005, lp: 2200 }); breath(860, 1350, 1100, 0.16, 0.14, 6, 0, 0.3, 0.15);
+}
+function pageTurn() {
+  // a page of the art book turning: a swish of paper with the edge fluttering, and a little of the room
+  if (!AC || muted || !SCORE_E) return;
+  const t = AC.currentTime + 0.02, s = AC.createBufferSource(), bp = AC.createBiquadFilter(), g = AC.createGain(), fl = AC.createOscillator(), fg = AC.createGain();
+  s.buffer = SCORE_E.noise; bp.type = 'bandpass'; bp.Q.value = 0.7;
+  bp.frequency.setValueAtTime(900, t); bp.frequency.exponentialRampToValueAtTime(3800, t + 0.22); bp.frequency.exponentialRampToValueAtTime(1500, t + 0.55);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.11, t + 0.06); g.gain.setValueAtTime(0.11, t + 0.13); g.gain.exponentialRampToValueAtTime(0.025, t + 0.32); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.64);
+  fl.frequency.value = 23; fg.gain.value = 0.035; fl.connect(fg); fg.connect(g.gain);
+  s.connect(bp); bp.connect(g); g.connect(master); sendHall(g, 0.2); s.start(t, Math.random()); s.stop(t + 0.7); fl.start(t); fl.stop(t + 0.7);
+}
+function sfxPlate() { if (SCORE_E) { SCORE_E.event('plate'); pageTurn(); return; } [294, 440, 587].forEach((f, i) => tone('sine', f, f, 2.6, 0.05, { att: 0.25, delay: i * 0.12 })); }
+function sfxFuse() {
+  if (SCORE_E) {
+    // under the Resurrection chorale, a deep bowed open fifth swells up from the basses
+    SCORE_E.event('fuse'); const t = AC.currentTime + 0.1;
+    for (const [m, low, g] of [[42, true, 0.5], [49, false, 0.34], [54, false, 0.3]]) bowString(SCORE_E, { t, f: mtof(m), vel: 0.6, dur: 5, att: 1.6, rel: 3.5, pan: low ? 0.3 : -0.2, g, vib: 8, vr: 4.8, vdel: 0.8, det: 4, trem: 0, low }, low ? SCORE_E.loIn : SCORE_E.hiIn);
+    return;
+  }
+  [196, 247, 294, 392, 494].forEach((f, i) => tone('sine', f, f, 4.5, 0.07, { att: 1.1, delay: i * 0.22 }));
+}
 
 // ================================================================= ui helpers
 const hud = { s: $('hSeams'), p: $('hPack'), pl: $('hPlates') }, hudVals = {};
@@ -2809,13 +2871,17 @@ function updateHud() {
 let toastT = 0, bannerT = 0, promptText = '';
 function toast(msg, dur = 3) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); toastT = dur; }
 function banner(name, eye = 'You enter') { $('banEye').textContent = eye; $('banName').textContent = name; $('banner').classList.add('on'); bannerT = 3.6; }
-function showCard(eye, title, text, dur = 12) {
+function showCard(eye, title, text, dur = 12, spread = false) {
+  $('caption').classList.toggle('spread', spread); document.body.classList.toggle('spreading', spread); S.spread = spread;
   $('capEye').textContent = eye; $('capTitle').textContent = title; $('capText').textContent = text;
   $('capDismiss').textContent = document.body.classList.contains('touch') ? 'Tap to close' : 'Press E or click to close';
   const c = $('caption'); c.hidden = false; c.style.animation = 'none'; void c.offsetWidth; c.style.animation = '';
   cardOpen = true; cardTimer = dur;
 }
-function hideCard() { $('caption').hidden = true; cardOpen = false; }
+function hideCard() {
+  $('caption').hidden = true; cardOpen = false;
+  if (S.spread) { S.spread = false; document.body.classList.remove('spreading'); if (S.cineM === 'face') S.cineT = Math.min(S.cineT, 0.5); }   // close the book: the camera comes home
+}
 function setPrompt(txt) { if (txt === promptText) return; promptText = txt; const p = $('prompt'); p.hidden = !txt; p.innerHTML = txt; }
 
 // ================================================================= gameplay
@@ -2851,7 +2917,7 @@ function collect(r) {
 function readPlate(i) {
   const l = LM[i], first = !S.plates.has(i); S.plates.add(i); updateHud(); sfxPlate();
   let text = l.text; if (i === 7 && packCount() === W.dogs.length && !S.steed) text += ' The whole pack is with you now. Stand by the drum and press E.';
-  showCard(`Plate ${l.num}${first ? '' : ' · read again'}`, l.name, text); P.reachT = 1.2; cineStart(5.5, 'face');
+  showCard(`Plate ${l.num}${first ? '' : ' · read again'}`, l.name, text, 45, true); P.reachT = 1.2; cineStart(45, 'face'); S.cineA = -1;   // he faces the facing page, as in the painting
 }
 function cineStart(d, mode = 'body') { S.cineT = d; S.cineD = d; S.cineM = mode; S.cineA = Math.random() < 0.75 ? -1 : 1; }
 function joinDog(d) {
@@ -3299,7 +3365,7 @@ function placeActors(dt) {
   }
 }
 // ---- studio staging (title + close cine): camera-locked olive backdrop card, far-plane clip; subject layers for the isolation mask
-let STAGE = null, tagT = 0, heroK = 1, painterK = 0.85, isoK = 0, isoBK = 1;
+let STAGE = null, tagT = 0, heroK = 1, painterK = 0.85, isoK = 0, isoBK = 1, spreadK = 0;
 const DEG = Math.PI / 180, FAR0 = camera.far, STG_SUNC = C('#ffe8c8');
 const _hipsW = new T.Vector3(), _fwdW = new T.Vector3(), _camDir = new T.Vector3(), _fuv = new T.Vector2(0.5, 0.5), _fuvT = new T.Vector2(0.5, 0.5), _ccSave = new T.Color();
 function buildStage() {
@@ -3365,7 +3431,7 @@ function render(dt) {
   sun.color.copy(sv.sun); sun.intensity = sv.sunI;
   const hero = !S.started || S.paused, dk = Math.min(1, dt * 3);
   // title light: a warm studio key, little sky fill (blended so leaving the title does not pop)
-  heroK = lerp(heroK, hero ? 1 : 0, dk);
+  heroK = lerp(heroK, hero ? 1 : 0, dk); spreadK = lerp(spreadK, S.spread ? 1 : 0, dk);
   if (heroK > 0.001) { sun.color.lerp(STG_SUNC, heroK); sun.intensity = lerp(sun.intensity, 1.15, heroK); hemi.intensity = lerp(hemi.intensity, 0.15, heroK); }
   placeActors(dt);
   // camera
@@ -3396,7 +3462,9 @@ function render(dt) {
   const cine = !hero && S.cineT > 0;
   if (cine) {
     const el = S.cineD - S.cineT;
-    if (S.cineM === 'face') { const a = P.head + S.cineA * (Math.PI / 2 - 0.38) + el * 0.045 * S.cineA, dist = 3.4; _tgt.set(_hp.x, _hp.y, _hp.z); _cam.set(_hp.x + Math.sin(a) * dist, _hp.y + 0.05, _hp.z + Math.cos(a) * dist); fovT = 22; }
+    // the face close-up; a spread turns him three-quarter so the face reads, and moves him onto the left page
+    if (S.cineM === 'face') { const a = P.head + S.cineA * (Math.PI / 2 - (S.spread ? 0.85 : 0.38)) + el * 0.045 * S.cineA, dist = 3.4; _tgt.set(_hp.x, _hp.y, _hp.z); _cam.set(_hp.x + Math.sin(a) * dist, _hp.y + 0.05, _hp.z + Math.cos(a) * dist); fovT = 22;
+      if (S.spread && VW > 900) { const sh = Math.tan(11 * DEG) * dist * camera.aspect * 0.34; _tgt.x += Math.cos(a) * sh; _tgt.z -= Math.sin(a) * sh; _cam.x += Math.cos(a) * sh; _cam.z -= Math.sin(a) * sh; } }
     else if (S.cineM === 'ride') { const a = P.head - Math.PI / 2 - 0.3 + el * 0.06, dist = 9, hy = G.root.position.y + 1.05; _tgt.set(gx + Math.sin(P.head) * 0.8, hy, gz + Math.cos(P.head) * 0.8); _cam.set(gx + Math.sin(a) * dist, hy + 0.35, gz + Math.cos(a) * dist); fovT = 32; }
     else { const dist = S.riding ? 5.5 : 4.0, a = P.head + S.cineA * (Math.PI / 2 + 0.5) + el * 0.07 * S.cineA, hy = G.root.position.y + (S.riding ? 1.35 : 1.3); _tgt.set(gx, hy, gz); _cam.set(gx + Math.sin(a) * dist, hy + 0.2, gz + Math.cos(a) * dist); fovT = 30; }
   }
@@ -3424,7 +3492,7 @@ function render(dt) {
   if (stageOn) {
     const h = 2 * Math.tan(camera.fov * DEG / 2) * stD * 1.4;
     STAGE.position.copy(camera.position).addScaledVector(_camDir, stD); STAGE.quaternion.copy(camera.quaternion); STAGE.scale.set(h * camera.aspect, h, 1); STAGE.visible = true;
-    STAGE.material.uniforms.uGut.value = heroK; _v.copy(_hipsW); _v.y += 0.18; _v.project(camera); STAGE.material.uniforms.uHalo.value.set(0.5 + clamp(_v.x, -1.4, 1.4) * 0.5 / 1.4, 0.5 + clamp(_v.y, -1.4, 1.4) * 0.5 / 1.4);
+    STAGE.material.uniforms.uGut.value = Math.max(heroK, spreadK); _v.copy(_hipsW); _v.y += 0.18; _v.project(camera); STAGE.material.uniforms.uHalo.value.set(0.5 + clamp(_v.x, -1.4, 1.4) * 0.5 / 1.4, 0.5 + clamp(_v.y, -1.4, 1.4) * 0.5 / 1.4);
     scene.fog.density = 0;
   } else STAGE.visible = false;
   const baseL = stageOn ? 4 : 0; camera.layers.set(baseL);
@@ -3437,7 +3505,7 @@ function render(dt) {
   const expo = lerp(sv.exp, 0.9, heroK);
   if (composer) {
     const fu = finalPass.uniforms;
-    fu.uTime.value = S.t; fu.uExposure.value = expo; fu.uMapK.value = lerp(1, 0.4, heroK);
+    fu.uTime.value = S.t; fu.uExposure.value = expo; fu.uMapK.value = lerp(1, 0.4, Math.max(heroK, spreadK));
     bloom.strength = lerp(0.3 + 0.45 * sv.night, 0.25, heroK); bloom.enabled = true;
     // isolation drive: the card already isolates the title; staged close-ups get a lighter touch so the card is not doubled
     isoK = lerp(isoK, hero ? 0 : cine ? (stageOn ? 0.4 : 1.0) : prof ? 0.75 : 0.45, dk);
