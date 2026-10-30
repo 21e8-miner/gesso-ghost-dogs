@@ -690,23 +690,31 @@ const PaintShader = {
     }`,
 };
 // the two-pass painter as one composer pass; exposes the paint uniforms as .uniforms so render() can drive it
-// ambient occlusion, built for this pipeline: one depth-only prepass at half resolution (ghosts, particles, sky and decals left out,
-// ghost paws kept so the dogs are grounded), Alchemy-style AO (McGuire et al.) from 12 spiral samples with normals rebuilt from depth,
-// then a depth-aware blur in the composite. Occlusion is laid in as a warm umber glaze, light on Gesso and the ghosts.
+// ambient occlusion and one bounce of light, built for this pipeline: one depth-only prepass at half resolution (ghosts, particles, sky
+// and decals left out, ghost paws kept so the dogs are grounded), then screen-space indirect lighting with a visibility bitmask
+// (Therrien, Levesque & Gilet 2023; the sector maths after Intel's XeGTAO and Bevy's VBAO). Each slice keeps its hemisphere as 32 bits;
+// every occluder is a slab of constant thickness, so light slips behind thin things and the occlusion loses its halos, and the sectors a
+// sample newly hides carry that sample's own colour back as bounce light. Normals are rebuilt from depth. r128 compiles WebGL2 shaders
+// as GLSL ES 3.00, so the bit work is native. A depth-aware blur in the composite; occlusion goes on as a warm umber glaze.
 // r128's examples/js build exposes FullScreenQuad as THREE.FullScreenQuad (later builds: THREE.Pass.FullScreenQuad)
 const FSQ = T.FullScreenQuad || (T.Pass && T.Pass.FullScreenQuad);
 const AOShader = {
-  uniforms: { tDepth: { value: null }, uRes: { value: new T.Vector2(1, 1) }, uNear: { value: 0.1 }, uFar: { value: 1000 }, uTanX: { value: 1 }, uTanY: { value: 1 },
-    uProjScale: { value: 1 }, uRadius: { value: 1.3 }, uIntensity: { value: 2.6 } },
+  uniforms: { tDepth: { value: null }, tColor: { value: null }, uRes: { value: new T.Vector2(1, 1) }, uNear: { value: 0.1 }, uFar: { value: 1000 }, uTanX: { value: 1 }, uTanY: { value: 1 },
+    uProjScale: { value: 1 }, uRadius: { value: 1.9 }, uIntensity: { value: 2.6 }, uThick: { value: 0.45 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
     #include <packing>
-    uniform sampler2D tDepth; uniform vec2 uRes; uniform float uNear, uFar, uTanX, uTanY, uProjScale, uRadius, uIntensity; varying vec2 vUv;
+    uniform sampler2D tDepth, tColor; uniform vec2 uRes; uniform float uNear, uFar, uTanX, uTanY, uProjScale, uRadius, uIntensity, uThick; varying vec2 vUv;
     float vz(vec2 uv){ return perspectiveDepthToViewZ(texture2D(tDepth, uv).x, uNear, uFar); }
     vec3 vpos(vec2 uv, float z){ vec2 n = uv * 2.0 - 1.0; return vec3(n.x * uTanX * -z, n.y * uTanY * -z, z); }
+    #if __VERSION__ >= 300
+    // the sectors from a to b (0..1 across the slice's hemisphere) as bits, and how many bits are set
+    uint sectors(float a, float b){ uint s = uint(clamp(a, 0.0, 1.0) * 32.0), e = uint(clamp(ceil(b * 32.0), 0.0, 32.0)); if (e <= s) return 0u; uint c = e - s; return (c >= 32u ? 0xFFFFFFFFu : (1u << c) - 1u) << s; }
+    float pop(uint v){ v = v - ((v >> 1u) & 0x55555555u); v = (v & 0x33333333u) + ((v >> 2u) & 0x33333333u); return float((((v + (v >> 4u)) & 0x0F0F0F0Fu) * 0x01010101u) >> 24u); }
+    #endif
     void main(){
       float d0 = texture2D(tDepth, vUv).x;
-      if (d0 >= 0.99999 || uIntensity < 0.001) { gl_FragColor = vec4(1.0); return; }
+      if (d0 >= 0.99999 || uIntensity < 0.001) { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
       float z = perspectiveDepthToViewZ(d0, uNear, uFar); vec3 p = vpos(vUv, z);
       vec2 tx = 1.0 / uRes;
       // normal from the flatter neighbour on each axis, so silhouettes don't smear
@@ -715,39 +723,67 @@ const AOShader = {
       vec3 dx = abs(pr.z - p.z) < abs(p.z - pl.z) ? pr - p : p - pl;
       vec3 dy = abs(pu.z - p.z) < abs(p.z - pd.z) ? pu - p : p - pd;
       vec3 n = normalize(cross(dx, dy));
-      float rUV = clamp(uRadius * uProjScale / -z, 2.5 * tx.y, 0.12);
       float ign = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));   // interleaved gradient noise
-      float asp = uRes.y / uRes.x, sum = 0.0, r2 = uRadius * uRadius;
-      for (int i = 0; i < 12; i++) {
-        float fi = float(i) + 0.5, a = fi * 2.39996 + ign * 6.2832, rr = sqrt(fi / 12.0) * rUV;
-        vec2 suv = vUv + vec2(cos(a) * asp, sin(a)) * rr;
-        vec3 v = vpos(suv, vz(suv)) - p; float d2 = dot(v, v);
-        sum += max(0.0, dot(n, v) - 0.002 * -z) / (d2 + 0.02) * max(0.0, 1.0 - d2 / r2);
+      float fade = 1.0 - smoothstep(45.0, 90.0, -z);
+      #if __VERSION__ >= 300
+      vec3 V = normalize(-p), gi = vec3(0.0); float occ = 0.0;
+      float rUV = clamp(uRadius * uProjScale / -z, 3.0 * tx.y, 0.15), asp = uRes.y / uRes.x;
+      for (int si = 0; si < 3; si++) {
+        float phi = (float(si) + ign) * 1.0471976;
+        vec2 om = vec2(cos(phi), sin(phi));
+        vec3 dv = vec3(om, 0.0), ortho = dv - dot(dv, V) * V, ax = cross(dv, V), pn = n - ax * dot(n, ax);
+        float nh = (1.5707963 - sign(dot(ortho, pn)) * acos(clamp(dot(pn, V) / max(length(pn), 1e-4), -1.0, 1.0))) / 3.1415927;
+        uint mask = 0u;
+        for (int sj = 0; sj < 4; sj++) {
+          float s = (float(sj) + fract(ign * 7.13 + float(si * 4 + sj) * 0.618034)) / 4.0; s *= s;
+          vec2 off = vec2(om.x * asp, om.y) * s * rUV;
+          for (int sd = 0; sd < 2; sd++) {
+            float dir = sd == 0 ? 1.0 : -1.0;
+            vec2 suv = vUv + off * dir;
+            if (suv.x < 0.0 || suv.y < 0.0 || suv.x > 1.0 || suv.y > 1.0) continue;
+            vec3 dp = vpos(suv, vz(suv)) - p; float dl = length(dp);
+            if (dl < 1e-3) continue;
+            // front and back of the sample (a slab of thickness uThick behind it) as angles from the view vector, then as sectors
+            vec2 fb = vec2(acos(clamp(dot(dp / dl, V), -1.0, 1.0)), acos(clamp(dot(normalize(dp - V * uThick), V), -1.0, 1.0))) / 3.1415927;
+            vec2 h = dir > 0.0 ? clamp(fb + nh, 0.0, 1.0) : clamp(nh - fb, 0.0, 1.0).yx;
+            uint b = sectors(h.x, h.y), nb = b & ~mask;
+            // the sectors this sample is first to hide: its colour arrives across them, cosine-weighted at the receiver
+            if (nb != 0u && dl < uRadius) gi += texture2D(tColor, suv).rgb * pop(nb) * max(dot(n, dp / dl), 0.0) * (1.0 - dl / uRadius);
+            mask |= b;
+          }
+        }
+        occ += pop(mask);
       }
-      float ao = clamp(1.0 - uIntensity * sum / 12.0, 0.0, 1.0);
-      gl_FragColor = vec4(vec3(mix(ao, 1.0, smoothstep(45.0, 90.0, -z))), 1.0);
+      float ao = clamp(1.0 - occ / 96.0 * uIntensity * 0.55, 0.0, 1.0);
+      gl_FragColor = vec4(gi / 96.0 * fade, mix(ao, 1.0, 1.0 - fade));
+      #else
+      gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+      #endif
     }`,
 };
 const AOCompShader = {
   uniforms: { tDiffuse: { value: null }, tAO: { value: null }, tDepth: { value: null }, tMask: { value: null }, uTexel: { value: new T.Vector2(1, 1) },
-    uNear: { value: 0.1 }, uFar: { value: 1000 }, uK: { value: 0.85 }, uMaskOn: { value: 0 }, uLine: { value: 0.55 } },
+    uNear: { value: 0.1 }, uFar: { value: 1000 }, uK: { value: 0.85 }, uMaskOn: { value: 0 }, uLine: { value: 0.55 }, uGI: { value: 2.4 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
     #include <packing>
-    uniform sampler2D tDiffuse, tAO, tDepth, tMask; uniform vec2 uTexel; uniform float uNear, uFar, uK, uMaskOn, uLine; varying vec2 vUv;
+    uniform sampler2D tDiffuse, tAO, tDepth, tMask; uniform vec2 uTexel; uniform float uNear, uFar, uK, uMaskOn, uLine, uGI; varying vec2 vUv;
     float lz(vec2 uv){ return perspectiveDepthToViewZ(texture2D(tDepth, uv).x, uNear, uFar); }
     void main(){
       vec3 col = texture2D(tDiffuse, vUv).rgb;
-      float z0 = lz(vUv), sum = 0.0, wsum = 0.0, tol = 0.04 * -z0 + 0.05;
+      float z0 = lz(vUv), wsum = 0.0, tol = 0.04 * -z0 + 0.05; vec4 acc = vec4(0.0);
       for (int j = -2; j <= 2; j++) for (int i = -2; i <= 2; i++) {
         vec2 uv = vUv + vec2(float(i), float(j)) * uTexel;
         float w = exp(-abs(lz(uv) - z0) / tol) * (1.0 - 0.12 * float(abs(i) + abs(j)));
-        sum += texture2D(tAO, uv).r * w; wsum += w;
+        acc += texture2D(tAO, uv) * w; wsum += w;
       }
-      float ao = sum / max(wsum, 1e-4), onG = 0.0;
+      acc /= max(wsum, 1e-4);
+      float ao = acc.a, onG = 0.0;
       if (uMaskOn > 0.5) { vec4 mk = texture2D(tMask, vUv); ao = mix(ao, 1.0, max(mk.r * 0.6, mk.g * 0.85)); onG = mk.r; }
       vec3 occ = mix(vec3(0.42, 0.34, 0.26), vec3(1.0), ao);   // a warm umber glaze, never grey dirt
-      col *= mix(vec3(1.0), occ, uK);
+      // bounce light lands on the receiver's own colour (its hue at a middling albedo; there is no G-buffer to ask)
+      vec3 alb = clamp(col / max(dot(col, vec3(0.2126, 0.7152, 0.0722)), 0.04), 0.0, 3.0) * 0.5;
+      col = col * mix(vec3(1.0), occ, uK) + acc.rgb * alb * uGI * step(0.01, uK);
       // the pencil: silhouettes are relative depth jumps in the depth prepass, drawn on the near side of the edge only;
       // ghosts never enter the prepass, so their edges stay soft, as painted
       float zl = lz(vUv - vec2(uTexel.x, 0.0)), zr = lz(vUv + vec2(uTexel.x, 0.0)), zd = lz(vUv - vec2(0.0, uTexel.y)), zu = lz(vUv + vec2(0.0, uTexel.y));
@@ -762,7 +798,7 @@ const AOPass = T.Pass && FSQ && class extends T.Pass {
     super(); this.scene = scene; this.camera = camera; this.needsSwap = true;
     const dt = new T.DepthTexture(); dt.type = T.UnsignedIntType;
     this.zRT = new T.WebGLRenderTarget(4, 4, { minFilter: T.NearestFilter, magFilter: T.NearestFilter, depthBuffer: true, depthTexture: dt });
-    this.aoRT = new T.WebGLRenderTarget(4, 4, { minFilter: T.LinearFilter, magFilter: T.LinearFilter, depthBuffer: false });
+    this.aoRT = new T.WebGLRenderTarget(4, 4, { type: T.HalfFloatType, minFilter: T.LinearFilter, magFilter: T.LinearFilter, depthBuffer: false });   // rgb bounce, a occlusion
     this.zMat = new T.MeshBasicMaterial({ colorWrite: false });
     this.aoMat = new T.ShaderMaterial(AOShader); this.cMat = new T.ShaderMaterial(AOCompShader);
     this.aoQuad = new FSQ(this.aoMat); this.cQuad = new FSQ(this.cMat);
@@ -796,7 +832,7 @@ const AOPass = T.Pass && FSQ && class extends T.Pass {
     for (let i = 0; i < sk.length; i++) sk[i].visible = vis[i];
     this.cMat.uniforms.uK.value = ok && this.aoMat.uniforms.uIntensity.value > 0 ? 0.85 : 0; this.cMat.uniforms.uLine.value = ok ? 0.55 * (this.lineK || 1) : 0;
     const ty = Math.tan(cam.fov * Math.PI / 360), u = this.aoMat.uniforms, c = this.cMat.uniforms;
-    u.tDepth.value = this.zRT.depthTexture; u.uNear.value = cam.near; u.uFar.value = cam.far; u.uTanY.value = ty; u.uTanX.value = ty * cam.aspect; u.uProjScale.value = 0.5 / ty;
+    u.tDepth.value = this.zRT.depthTexture; u.tColor.value = readBuffer.texture; u.uNear.value = cam.near; u.uFar.value = cam.far; u.uTanY.value = ty; u.uTanX.value = ty * cam.aspect; u.uProjScale.value = 0.5 / ty;
     renderer.setRenderTarget(this.aoRT); this.aoQuad.render(renderer);
     c.tDiffuse.value = readBuffer.texture; c.tAO.value = this.aoRT.texture; c.tDepth.value = this.zRT.depthTexture; c.uNear.value = cam.near; c.uFar.value = cam.far;
     renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer); this.cQuad.render(renderer);
@@ -820,10 +856,13 @@ const PainterPass = T.Pass && FSQ && class extends T.Pass {
 const FinalShader = {
   uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uExposure: { value: 1 }, uRes: { value: new T.Vector2(1, 1) },
     tMask: { value: null }, uMaskOn: { value: 0 }, uMapK: { value: 1 }, uIso: { value: 0 }, uIsoB: { value: 0 }, uTexel: { value: new T.Vector2(1, 1) }, uFocusUV: { value: new T.Vector2(0.5, 0.5) },
-    uHurt: { value: 0 }, uHurtP: { value: 0 }, uStill: { value: 0 }, uFade: { value: 0 } },
+    uHurt: { value: 0 }, uHurtP: { value: 0 }, uStill: { value: 0 }, uFade: { value: 0 },
+    tDepth: { value: null }, tReveal: { value: null }, uWorld: { value: 0 }, uNightK: { value: 0 }, uNear: { value: 0.1 }, uFar: { value: 1000 }, uTanX: { value: 1 }, uTanY: { value: 1 }, uCamW: { value: new T.Matrix4() } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse, tMask; uniform float uTime, uExposure, uMaskOn, uIso, uIsoB, uMapK, uHurt, uHurtP, uStill, uFade; uniform vec2 uRes, uTexel, uFocusUV; varying vec2 vUv;
+    #include <packing>
+    uniform sampler2D tDiffuse, tMask, tDepth, tReveal; uniform float uTime, uExposure, uMaskOn, uIso, uIsoB, uMapK, uHurt, uHurtP, uStill, uFade, uWorld, uNightK, uNear, uFar, uTanX, uTanY;
+    uniform vec2 uRes, uTexel, uFocusUV; uniform mat4 uCamW; varying vec2 vUv;
     vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); }
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }
@@ -864,11 +903,44 @@ const FinalShader = {
       vec3 pm = paintMap(lt), chroma = col - vec3(l);
       vec3 wcol = mix(col, pm + chroma * 0.28, uMapK);
       col = mix(wcol, mix(pm, col, 0.8) + chroma * 0.3, clamp(m * 1.2, 0.0, 1.0));
+      vec2 px = vUv * uRes; float weave = (sin(px.x * 1.9) * sin(px.y * 1.9)) * 0.5 + 0.5;
+      // the unpainted world: past where Gesso has walked the plain is still the underpainting, a bistre wash and a sinopia drawing on
+      // bare gesso. Paint floods outward as he explores, a wet front with a tide-line where the pigment pooled, found in world space
+      // (each pixel's ground position from the depth prepass, read against the explored grid), so the front stays put on the land
+      if (uWorld > 0.5) {
+        float dz = texture2D(tDepth, vUv).x, paint = 1.0, tide = 0.0;
+        if (dz < 0.99999) {
+          float vzz = perspectiveDepthToViewZ(dz, uNear, uFar); vec2 nd = vUv * 2.0 - 1.0;
+          vec3 wp = (uCamW * vec4(nd.x * uTanX * -vzz, nd.y * uTanY * -vzz, vzz, 1.0)).xyz;
+          float wet = texture2D(tReveal, (wp.xz + 800.0) / 1600.0).r + (vn(wp.xz * 0.045) - 0.5) * 0.55 + (vn(wp.xz * 0.21 + 7.3) - 0.5) * 0.22 + (vn(wp.xz * 1.1) - 0.5) * 0.06;
+          paint = smoothstep(0.36, 0.56, wet); tide = exp(-pow((wet - 0.47) / 0.03, 2.0));   // the paint thins out into the drawing
+        }
+        float sub = max(mk.r, mk.g); paint = max(paint, sub);   // Gesso and the ghosts always carry their paint
+        if (paint < 0.999) {
+          float L = dot(col, vec3(0.299, 0.587, 0.114)), dk = 1.0 - L, sc = max(1.0, uRes.y / 900.0);
+          // a sepia wash study on the book's own facing-page paper: three umber washes laid by value, each drying to a darker edge
+          float wn = (vn(px / 90.0) - 0.5) * 0.06, d2 = dk + wn;
+          vec3 und = vec3(0.85, 0.82, 0.71) * (0.97 + 0.03 * weave);
+          for (int i = 0; i < 3; i++) {
+            float t = 0.22 + 0.23 * float(i), wsh = smoothstep(t - 0.02, t + 0.02, d2), rim = exp(-pow((d2 - t - 0.02) / 0.012, 2.0));
+            und *= mix(vec3(1.0), vec3(0.88, 0.8, 0.68), wsh) * (1.0 - 0.07 * rim);
+          }
+          // umber lines from the picture's own edges, and loose single hatching in the deepest wash
+          vec2 e = uTexel * 2.0 * sc;
+          float gx = dot(texture2D(tDiffuse, vUv + vec2(e.x, 0.0)).rgb - texture2D(tDiffuse, vUv - vec2(e.x, 0.0)).rgb, vec3(0.333));
+          float gy = dot(texture2D(tDiffuse, vUv + vec2(0.0, e.y)).rgb - texture2D(tDiffuse, vUv - vec2(0.0, e.y)).rgb, vec3(0.333));
+          float line = smoothstep(0.18, 0.5, length(vec2(gx, gy)) / (l0 + 0.12));
+          vec2 hp = px + 2.5 * vec2(vn(px / 50.0), vn(px / 50.0 + 4.1));
+          float hatch = (1.0 - smoothstep(0.1, 0.24, abs(fract((hp.x - hp.y * 0.6) / (7.0 * sc)) - 0.5))) * smoothstep(0.62, 0.7, d2) * 0.45;
+          und = mix(und, vec3(0.3, 0.24, 0.17), clamp(line * 0.7 + hatch, 0.0, 0.8)) * mix(1.0, 0.3, uNightK);   // by moonlight, the drawing dims with the paint
+          col = mix(und, col, paint);
+        }
+        col = mix(col, col * vec3(0.74, 0.67, 0.58), tide * 0.5 * (1.0 - sub));   // the wet edge, darker where the wash dried
+      }
       float lg = dot(col, vec3(0.299, 0.587, 0.114));
       vec2 fc = vUv - uFocusUV;
       col *= mix(0.6, 1.0, smoothstep(0.9, 0.25, length(fc * vec2(1.05, 1.0))));
       // paper: a faint canvas weave and fibre tooth, strongest in the lights, grain refreshed at ~12 fps so it never sizzles
-      vec2 px = vUv * uRes; float weave = (sin(px.x * 1.9) * sin(px.y * 1.9)) * 0.5 + 0.5;
       float tooth = hash(floor(px / 2.0) + floor(uTime * 12.0) * 13.1);
       col *= 1.0 - 0.035 * weave * smoothstep(0.3, 0.9, lg) - 0.03 * (tooth - 0.5);
       // Still Life: the paint lifts off the drawing underneath, graphite hatching on bare paper laid in by darkness, contours from
@@ -2690,6 +2762,7 @@ function buildActors() {
 // ================================================================= state + save
 const S = { t: 0, clock: DAY * 0.06, started: false, paused: true, ready: false, collected: new Set(), marked: new Set(), plates: new Set(), steed: false, riding: false, whistleCD: 0, timeK: 1 };
 const FN = 80, fog = new Uint8Array(FN * FN);
+const PAINT = { a: new Float32Array(FN * FN), at: new Float32Array(FN * FN).fill(1e9), data: new Uint8Array(FN * FN), tex: null, dirty: true };
 let camMode = store.get('gesso-cam') === 'profile' ? 'profile' : 'follow';
 let mapOpen = false, cardOpen = false, cardTimer = 0, muted = store.get('gesso-muted') === '1', quality = store.get('gesso-quality') || 'high';
 const camS = { yaw: 0, pitch: 0.24, dist: 6.2, tdist: 6.2, lastDrag: -10, x: 0, y: 5, z: 20, shake: 0 };
@@ -2703,7 +2776,7 @@ function resetAll() {
   P.x = PLAYER_START.x; P.z = PLAYER_START.z; P.vx = P.vz = 0; P.head = Math.PI; camS.yaw = 0;
   S.collected.clear(); S.marked.clear(); S.plates.clear(); S.steed = false; S.riding = false; S.clock = DAY * 0.06;
   INK.kills = 0; INK.seen = false; STILL.meter = 0.75; HP.v = 1; HP.down = 0; if (INK.g) inkClear(); INK.next = 45;
-  fog.fill(0); resetDogs();
+  fog.fill(0); PAINT.a.fill(0); PAINT.at.fill(1e9); PAINT.dirty = true; resetDogs();
 }
 const SAVE_KEY = 'gesso-ghost-dogs-v2';
 function serialize() {
@@ -2718,7 +2791,8 @@ function applySave(s) {
   INK.kills = s.ink || 0; INK.seen = !!s.inkSeen; STILL.meter = s.still != null ? clamp(s.still, 0, 1) : 0.75;
   resetDogs();
   (s.dogs || []).forEach((v, i) => { const d = W.dogs[i]; if (!d) return; if (v === 1) { d.joined = true; d.state = 'follow'; d.sit = 0; d.x = P.x - 1 + i * 0.4; d.z = P.z + 1.5; } else if (v === 2) d.marked = true; });
-  if (typeof s.fog === 'string' && s.fog.length === fog.length) for (let i = 0; i < fog.length; i++) fog[i] = s.fog.charCodeAt(i) === 49 ? 1 : 0;
+  if (typeof s.fog === 'string' && s.fog.length === fog.length) for (let i = 0; i < fog.length; i++) { fog[i] = s.fog.charCodeAt(i) === 49 ? 1 : 0; PAINT.a[i] = fog[i]; }
+  PAINT.dirty = true;
   return true;
 }
 function save() { if (S.started && S.ready) store.set(SAVE_KEY, JSON.stringify(serialize())); }
@@ -2982,13 +3056,23 @@ function showCard(eye, title, text, dur = 12, spread = false) {
 function hideCard() {
   $('caption').hidden = true; cardOpen = false;
   if (S.spread) { S.spread = false; document.body.classList.remove('spreading'); if (S.cineM === 'face') S.cineT = Math.min(S.cineT, 0.5); }   // close the book: the camera comes home
+  if (S.plateFlood) { const f = S.plateFlood; S.plateFlood = null; reveal(f.x, f.z, 12, 45); if (f.first && !S.paintTip) { S.paintTip = true; toast('Each plate you read paints the land around it.', 3.4); } }
 }
 function setPrompt(txt) { if (txt === promptText) return; promptText = txt; const p = $('prompt'); p.hidden = !txt; p.innerHTML = txt; }
 
 // ================================================================= gameplay
-function reveal(x, z) {
-  const R = 7, ci = Math.floor((x + HALFW) / 20), cj = Math.floor((z + HALFW) / 20);
-  for (let j = cj - R; j <= cj + R; j++) for (let i = ci - R; i <= ci + R; i++) { if (i < 0 || j < 0 || i >= FN || j >= FN) continue; if ((i - ci) ** 2 + (j - cj) ** 2 <= R * R) fog[j * FN + i] = 1; }
+function reveal(x, z, R = 7, speed = 80) {
+  const ci = Math.floor((x + HALFW) / 20), cj = Math.floor((z + HALFW) / 20);
+  for (let j = cj - R; j <= cj + R; j++) for (let i = ci - R; i <= ci + R; i++) { if (i < 0 || j < 0 || i >= FN || j >= FN) continue; if ((i - ci) ** 2 + (j - cj) ** 2 <= R * R) { const k = j * FN + i; if (!fog[k]) { fog[k] = 1; paintFrom(k, x, z, speed); } } }
+}
+// paint reaches a newly explored cell after a delay set by its distance, so it floods out from Gesso across the drawing
+function paintFrom(k, x, z, speed) { const cx = (k % FN + 0.5) * 20 - HALFW, cz = (Math.floor(k / FN) + 0.5) * 20 - HALFW; PAINT.at[k] = S.t + 0.15 + Math.hypot(cx - x, cz - z) / speed; }
+function paintFlood(speed) { for (let k = 0; k < fog.length; k++) { PAINT.a[k] = 0; PAINT.at[k] = 1e9; if (fog[k]) paintFrom(k, P.x, P.z, speed); } PAINT.dirty = true; }
+function updatePaint(dt) {
+  if (!PAINT.tex) { PAINT.tex = new T.DataTexture(PAINT.data, FN, FN, renderer.capabilities.isWebGL2 ? T.RedFormat : T.LuminanceFormat); PAINT.tex.magFilter = PAINT.tex.minFilter = T.LinearFilter; PAINT.tex.generateMipmaps = false; }
+  let ch = PAINT.dirty;
+  for (let k = 0; k < fog.length; k++) if (fog[k] && PAINT.a[k] < 1 && S.t >= PAINT.at[k]) { PAINT.a[k] = Math.min(1, PAINT.a[k] + dt * 1.6); ch = true; }
+  if (ch) { for (let k = 0; k < fog.length; k++) PAINT.data[k] = Math.round(smooth(PAINT.a[k]) * 255); PAINT.tex.needsUpdate = true; PAINT.dirty = false; }
 }
 function fogAt(x, z) { const i = Math.floor((x + HALFW) / 20), j = Math.floor((z + HALFW) / 20); return i >= 0 && j >= 0 && i < FN && j < FN && fog[j * FN + i] === 1; }
 function emit(x, y, z, n, o) {
@@ -3020,6 +3104,7 @@ function readPlate(i) {
   const l = LM[i], first = !S.plates.has(i); S.plates.add(i); updateHud(); sfxPlate();
   let text = l.text; if (i === 7 && packCount() === W.dogs.length && !S.steed) text += ' The whole pack is with you now. Stand by the drum and press E.';
   showCard(`Plate ${l.num}${first ? '' : ' · read again'}`, l.name, text, 45, true); P.reachT = 1.2; cineStart(45, 'face'); S.cineA = -1;   // he faces the facing page, as in the painting
+  const st = W.steles.find(s => s.lm === i); if (st) S.plateFlood = { x: st.x, z: st.z, first };   // closing the page paints the land around the plate
 }
 function cineStart(d, mode = 'body') { S.cineT = d; S.cineD = d; S.cineM = mode; S.cineA = Math.random() < 0.75 ? -1 : 1; }
 function joinDog(d) {
@@ -3157,7 +3242,7 @@ document.body.classList.add('titling');   // the game opens on its title plate
 function startGame() {
   if (!S.ready) return; audioInit();
   if (!S.riding) { emit(P.x, P.y + 1.6, P.z, 50, { sp: 6, up: 3, life: 1.3, c: new T.Color(1.6, 1.5, 1.3), s: 1.2 }); W.dogs.forEach((d, i) => { if (d.joined) { d.x = P.x + Math.cos(i * 2.4) * 2.2; d.z = P.z + Math.sin(i * 2.4) * 2.2; d.vx = d.vz = 0; d.hop = 0.2; } }); }
-  const first = !S.started; S.started = true; setPaused(false); updateHud(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  const first = !S.started; S.started = true; setPaused(false); if (first) paintFlood(150); updateHud(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   if (first && S.plates.size === 0 && S.collected.size === 0) {
     banner('The Ochre Flats');
     setTimeout(() => toast(document.body.classList.contains('touch') ? 'Tap Whistle and your dogs will sniff out the green seams.' : 'Press Space to whistle. Your dogs will sniff out the green seams.', 5), 3800);
@@ -4067,6 +4152,7 @@ function update(rdt) {
   const reach = S.riding ? 2.4 : 1.4;
   for (const r of W.relics) if (!S.collected.has(r.id) && Math.abs(r.x - P.x) < 3 && Math.abs(r.z - P.z) < 3 && Math.hypot(r.x - P.x, r.z - P.z) < reach) collect(r);
   fogT -= dt; if (fogT <= 0) { fogT = 0.3; reveal(P.x, P.z); }
+  updatePaint(dt);
   biomeCheck -= dt;
   if (biomeCheck <= 0 && playing()) {
     biomeCheck = 0.5; const b = biomeAt(P.x, P.z);
@@ -4330,6 +4416,8 @@ function render(dt) {
   if (composer) {
     const fu = finalPass.uniforms;
     fu.uTime.value = S.t; fu.uExposure.value = expo; fu.uMapK.value = lerp(1, 0.4, Math.max(heroK, spreadK));
+    fu.uWorld.value = aoPass && quality === 'high' && !stageOn && PAINT.tex ? 1 : 0; fu.tReveal.value = PAINT.tex; fu.uNightK.value = sv.night;
+    if (aoPass) { const tY = Math.tan(camera.fov * DEG / 2); fu.tDepth.value = aoPass.zRT.depthTexture; fu.uNear.value = camera.near; fu.uFar.value = camera.far; fu.uTanY.value = tY; fu.uTanX.value = tY * camera.aspect; fu.uCamW.value.copy(camera.matrixWorld); }
     fu.uHurt.value = smooth(clamp((1 - HP.v) * 1.1, 0, 1)) * (1 - heroK); fu.uHurtP.value = HP.pulse * (1 - heroK); fu.uStill.value = STILL.k; fu.uFade.value = downFade();
     bloom.strength = lerp(0.3 + 0.45 * sv.night, 0.25, heroK); bloom.enabled = true;
     // isolation drive: the card already isolates the title; staged close-ups get a lighter touch so the card is not doubled
