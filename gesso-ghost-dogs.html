@@ -183,7 +183,7 @@ const cv = $('game');
 let renderer;
 try { renderer = new T.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: 'high-performance' }); }
 catch (e) { $('bStart').textContent = 'This browser could not start WebGL.'; return; }
-renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap;   // PCF honours shadow.radius: wide, airbrushed penumbras
 if (HAS_POST) { renderer.toneMapping = T.NoToneMapping; renderer.outputEncoding = T.LinearEncoding; }
 else { renderer.toneMapping = T.ACESFilmicToneMapping; renderer.outputEncoding = T.sRGBEncoding; }
 const MAXANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
@@ -476,7 +476,7 @@ function refreshEnv() { const old = envRT; envRT = pmrem.fromScene(skyScene, 0.0
 
 const sun = new T.DirectionalLight(0xffffff, 2); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 520 });
-sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.5; scene.add(sun); scene.add(sun.target);
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.5; sun.shadow.radius = 3.5; scene.add(sun); scene.add(sun.target);
 const hemi = new T.HemisphereLight(0xd6d0b4, 0x8a7350, 0.7); scene.add(hemi);
 const KF = [
   [0.00, '#8f8a70', '#d2cbb0', '#fff0d8', 1.6, 0.22, 0.9],
@@ -613,7 +613,7 @@ const AOShader = {
     vec3 vpos(vec2 uv, float z){ vec2 n = uv * 2.0 - 1.0; return vec3(n.x * uTanX * -z, n.y * uTanY * -z, z); }
     void main(){
       float d0 = texture2D(tDepth, vUv).x;
-      if (d0 >= 0.99999) { gl_FragColor = vec4(1.0); return; }
+      if (d0 >= 0.99999 || uIntensity < 0.001) { gl_FragColor = vec4(1.0); return; }
       float z = perspectiveDepthToViewZ(d0, uNear, uFar); vec3 p = vpos(vUv, z);
       vec2 tx = 1.0 / uRes;
       // normal from the flatter neighbour on each axis, so silhouettes don't smear
@@ -637,11 +637,11 @@ const AOShader = {
 };
 const AOCompShader = {
   uniforms: { tDiffuse: { value: null }, tAO: { value: null }, tDepth: { value: null }, tMask: { value: null }, uTexel: { value: new T.Vector2(1, 1) },
-    uNear: { value: 0.1 }, uFar: { value: 1000 }, uK: { value: 0.85 }, uMaskOn: { value: 0 } },
+    uNear: { value: 0.1 }, uFar: { value: 1000 }, uK: { value: 0.85 }, uMaskOn: { value: 0 }, uLine: { value: 0.55 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
     #include <packing>
-    uniform sampler2D tDiffuse, tAO, tDepth, tMask; uniform vec2 uTexel; uniform float uNear, uFar, uK, uMaskOn; varying vec2 vUv;
+    uniform sampler2D tDiffuse, tAO, tDepth, tMask; uniform vec2 uTexel; uniform float uNear, uFar, uK, uMaskOn, uLine; varying vec2 vUv;
     float lz(vec2 uv){ return perspectiveDepthToViewZ(texture2D(tDepth, uv).x, uNear, uFar); }
     void main(){
       vec3 col = texture2D(tDiffuse, vUv).rgb;
@@ -651,10 +651,17 @@ const AOCompShader = {
         float w = exp(-abs(lz(uv) - z0) / tol) * (1.0 - 0.12 * float(abs(i) + abs(j)));
         sum += texture2D(tAO, uv).r * w; wsum += w;
       }
-      float ao = sum / max(wsum, 1e-4);
-      if (uMaskOn > 0.5) { vec4 mk = texture2D(tMask, vUv); ao = mix(ao, 1.0, max(mk.r * 0.6, mk.g * 0.85)); }
+      float ao = sum / max(wsum, 1e-4), onG = 0.0;
+      if (uMaskOn > 0.5) { vec4 mk = texture2D(tMask, vUv); ao = mix(ao, 1.0, max(mk.r * 0.6, mk.g * 0.85)); onG = mk.r; }
       vec3 occ = mix(vec3(0.42, 0.34, 0.26), vec3(1.0), ao);   // a warm umber glaze, never grey dirt
-      gl_FragColor = vec4(col * mix(vec3(1.0), occ, uK), 1.0);
+      col *= mix(vec3(1.0), occ, uK);
+      // the pencil: silhouettes are relative depth jumps in the depth prepass, drawn on the near side of the edge only;
+      // ghosts never enter the prepass, so their edges stay soft, as painted
+      float zl = lz(vUv - vec2(uTexel.x, 0.0)), zr = lz(vUv + vec2(uTexel.x, 0.0)), zd = lz(vUv - vec2(0.0, uTexel.y)), zu = lz(vUv + vec2(0.0, uTexel.y));
+      float jump = max(max(abs(zl - z0), abs(zr - z0)), max(abs(zd - z0), abs(zu - z0))) / max(-z0, 0.1);
+      float pencil = smoothstep(0.04, 0.12, jump) * (1.0 - smoothstep(30.0, 60.0, -z0)) * uLine * mix(1.0, 0.7, onG);
+      col = mix(col, col * vec3(0.5, 0.43, 0.34), pencil);
+      gl_FragColor = vec4(col, 1.0);
     }`,
 };
 const AOPass = T.Pass && FSQ && class extends T.Pass {
@@ -694,7 +701,7 @@ const AOPass = T.Pass && FSQ && class extends T.Pass {
     catch (e) { ok = false; this.skipT = 0; }   // something new joined the scene since the last scan: rescan next frame
     sc.overrideMaterial = ov; sc.background = bg; renderer.shadowMap.autoUpdate = sau;
     for (let i = 0; i < sk.length; i++) sk[i].visible = vis[i];
-    if (!ok) { this.cMat.uniforms.uK.value = 0; } else this.cMat.uniforms.uK.value = 0.85;
+    this.cMat.uniforms.uK.value = ok && this.aoMat.uniforms.uIntensity.value > 0 ? 0.85 : 0; this.cMat.uniforms.uLine.value = ok ? 0.55 : 0;
     const ty = Math.tan(cam.fov * Math.PI / 360), u = this.aoMat.uniforms, c = this.cMat.uniforms;
     u.tDepth.value = this.zRT.depthTexture; u.uNear.value = cam.near; u.uFar.value = cam.far; u.uTanY.value = ty; u.uTanX.value = ty * cam.aspect; u.uProjScale.value = 0.5 / ty;
     renderer.setRenderTarget(this.aoRT); this.aoQuad.render(renderer);
@@ -1410,6 +1417,14 @@ function plateGhostMat(o = {}) {
         vec3 n = normalize(vN); if (!gl_FrontFacing) n = -n;
         float fr = pow(1.0 - abs(dot(n, normalize(vV))), 2.0);
         float e = 1.0 - smoothstep(0.0, max(0.06, fwidth(vEdge) * 1.5), vEdge);
+        #ifdef GLAZE
+        // glaze pass: each pane is a transparent pigment layer that multiplies into what lies behind it, so overlapping
+        // layers deepen like watercolour or stained glass, and the order panes draw in no longer matters
+        vec3 pig = clamp(vTint * uTintMul * vec3(0.9, 0.86, 0.78), 0.0, 1.0);
+        pig = mix(vec3(dot(pig, vec3(0.3, 0.55, 0.15))), pig, 0.6);   // a quiet pigment: deepens what is behind it without dyeing the sand orange
+        float cov = clamp(uAlpha * uAlphaMul * vOp * (0.3 + 0.25 * e + 0.25 * fr), 0.0, 0.8);
+        gl_FragColor = vec4(mix(vec3(1.0), pig, cov), 1.0);
+        #else
         vec3 L = normalize(uKeyV); float nl = dot(n, L);
         vec3 col = vTint * uTintMul * (uAmb + uGlow + uSunC * 0.62 * (0.4 + 0.6 * max(nl, 0.0))) + 0.15 * uSunC * vTint * max(-nl, 0.0);
         col = max(col, vTint * uTintMul * 0.68);  // milky glass never sinks below the sand behind it
@@ -1432,12 +1447,15 @@ function plateGhostMat(o = {}) {
         // thin-film shimmer on the rim, held to the painting's mint-peach range
         vec3 irid = 0.5 + 0.5 * cos(6.2832 * (fr * 1.6 + flow * 0.6 + vec3(0.0, 0.33, 0.67)));
         col += mix(irid, vec3(0.75, 0.95, 0.85), 0.45) * fr * fr * 0.16;
-        gl_FragColor = vec4(col, uAlpha * uAlphaMul * vOp * (0.56 + 0.12 * e + 0.12 * fr + band * 0.06) * (1.0 + uGlow * 0.5));
+        gl_FragColor = vec4(col, uAlpha * uAlphaMul * vOp * (0.42 + 0.12 * e + 0.14 * fr + band * 0.06) * (1.0 + uGlow * 0.5));
         #include <fog_fragment>
+        #endif
         #include <encodings_fragment>
       }`;
-  const mk = side => new T.ShaderMaterial({ uniforms, vertexShader, fragmentShader, transparent: true, depthWrite: false, side, fog: true, extensions: { derivatives: true } });
-  const m = mk(T.FrontSide); m.userData.back = mk(T.BackSide);
+  const mk = (side, glaze) => new T.ShaderMaterial({ uniforms, vertexShader, fragmentShader, transparent: true, depthWrite: false, side, fog: true, extensions: { derivatives: true },
+    defines: glaze ? { GLAZE: 1 } : {}, blending: glaze ? T.MultiplyBlending : T.NormalBlending });
+  // pass 1 (renderOrder 2): the pigment glaze, both faces; pass 2 (renderOrder 3): the milky light on the near faces
+  const m = mk(T.FrontSide); m.userData.back = mk(T.DoubleSide, true);
   return m;
 }
 // large flat folded panes laid over a volume along +z; prof(t) gives [rx, ry, cy] of the cross-section at t in 0..1.
@@ -3234,7 +3252,7 @@ function render(dt) {
       const k = quality === 'high' && !hero ? front * low * 1.6 : 0; shaftPass.enabled = k > 0.01; shaftPass.uniforms.uK.value = k;
       shaftPass.uniforms.uSun.value.set(_shV.x * 0.5 + 0.5, _shV.y * 0.5 + 0.5); shaftPass.uniforms.uCol.value.copy(sv.sun).lerp(_shC.setRGB(1, 0.8, 0.55), 0.4);
     }
-    if (aoPass) { aoPass.enabled = quality === 'high' && !stageOn; aoPass.cMat.uniforms.uMaskOn.value = maskOn ? 1 : 0; }
+    if (aoPass) { aoPass.enabled = quality === 'high'; aoPass.aoMat.uniforms.uIntensity.value = stageOn ? 0 : 2.6; aoPass.cMat.uniforms.uMaskOn.value = maskOn ? 1 : 0; }
     paintPass.enabled = quality === 'high'; paintPass.uniforms.uMaskOn.value = maskOn ? 1 : 0; paintPass.uniforms.uK.value = hero ? 0.55 : 1;
     if (maskOn) {
       // one world-matrix update shared by the mask passes and the composer passes
