@@ -62,6 +62,25 @@ kbd{font-family:var(--ui);font-weight:700;font-size:.78em;padding:1px 5px;border
 .fine{font-size:13px;color:var(--ink-soft);margin-top:14px}
 @media (min-width:900px){ #title{place-items:center end;padding-right:max(5vw,env(safe-area-inset-right,0px));background:linear-gradient(90deg,rgba(14,11,7,0) 35%,rgba(14,11,7,.55))} .titlecard{width:min(500px,100%)} }
 .spec{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--rule);padding-bottom:8px}
+/* the title is a plate caption printed on the facing page of the art book: no card over the picture, ink on the pale page right of the gutter */
+#title{background:none;place-items:start end;padding-top:max(7vh,env(safe-area-inset-top,0px));padding-right:max(3.2vw,env(safe-area-inset-right,0px))}
+#title .titlecard{width:min(29vw,430px);background:none;border:0;box-shadow:none;padding:6px 4px}
+#title .titlecard::after{display:none}
+#title .titlecard h1{font-size:clamp(34px,3.3vw,58px)}
+#title .titlecard p{font-size:clamp(15px,1.15vw,18px);color:#2f2a20}
+.howto{margin:0 0 16px}
+.howto summary{cursor:pointer;font-family:var(--tech);letter-spacing:.14em;font-size:10px;text-transform:uppercase;color:var(--ink-soft);list-style:none;padding:6px 0}
+.howto summary::-webkit-details-marker{display:none}
+.howto summary::before{content:'+ '}
+.howto[open] summary::before{content:'\2013  '}
+.howto[open] .keys{background:rgba(236,227,202,.86);padding:10px 12px;border:1px solid var(--rule);margin-top:4px}
+body.titling #hud,body.titling #tools,body.titling #touch{visibility:hidden}
+@media (max-width:899px){
+  #title{place-items:end stretch;padding:0}
+  #title .titlecard{width:100%;max-height:56vh;overflow:auto;background:rgba(236,227,202,.94);border-top:3px solid var(--signal);padding:14px 18px calc(16px + env(safe-area-inset-bottom,0px));box-shadow:0 -10px 30px rgba(8,6,3,.35)}
+  #title .titlecard h1{font-size:clamp(30px,8vw,44px);margin:6px 0 8px}
+  #title .titlecard p{font-size:15px;margin-bottom:10px}
+}
 
 #mapview{position:fixed;inset:0;display:grid;place-items:center;background:rgba(10,8,5,.62);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .mapcard{background:var(--paper);border:1px solid var(--rule);border-top:3px solid var(--signal);padding:14px 16px;box-shadow:0 24px 60px rgba(8,6,3,.6);max-width:100%;box-sizing:border-box}
@@ -145,6 +164,7 @@ body.touch #caption{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
     <div class="spec"><span class="eyebrow">A wandering game in eight plates</span><span class="eyebrow">Survey No. 6</span></div>
     <h1>Gesso <i>&amp;</i> the Ghost Dogs</h1>
     <p>A plaster figure and two ghost dogs cross a painted plain where old machines still roll and ships fly the same loops overhead. Gather the green seams, read the eight plates, and find the four dogs still lost out there.</p>
+    <details class="howto"><summary>How to play</summary>
     <dl class="keys">
       <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · <kbd>Shift</kbd></dt><dd>Walk, and hold Shift to run. Drag to look around, scroll to zoom.</dd>
       <dt><kbd>Space</kbd></dt><dd>Whistle. Your dogs run off and point at the nearest seams.</dd>
@@ -153,6 +173,7 @@ body.touch #caption{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
       <dt><kbd>C</kbd></dt><dd>Side camera, like a painting. Steer with left and right.</dd>
       <dt><kbd>G</kbd></dt><dd>The wardrobe: dress Gesso in ancient garb.</dd>
     </dl>
+    </details>
     <div class="btns">
       <button class="btn primary" id="bStart" type="button" disabled>Painting the plain…</button>
       <button class="btn" id="bNew" type="button" hidden>New journey</button>
@@ -1456,7 +1477,11 @@ function applyGarb(id) {
 }
 function garbPose(ride) {
   if (!G || !G.garb || G.garb.ride === ride) return; G.garb.ride = ride;
-  for (const m of G.garb.skirts) { const b = m.userData.s0 || (m.userData.s0 = m.scale.clone()); m.scale.set(b.x * (ride ? 1.22 : 1), b.y * (ride ? 0.5 : 1), b.z * (ride ? 1.22 : 1)); }
+  for (const m of G.garb.skirts) {
+    const b = m.userData.s0 || (m.userData.s0 = m.scale.clone()), r0 = m.userData.r0 != null ? m.userData.r0 : (m.userData.r0 = m.rotation.x);
+    // seated, the hem lifts over the thighs in front and falls behind, a short drape rather than a drum
+    m.scale.set(b.x * (ride ? 1.12 : 1), b.y * (ride ? 0.62 : 1), b.z * (ride ? 1.18 : 1)); m.rotation.x = r0 + (ride ? -0.55 : 0);
+  }
 }
 function facetGeo(geo, jit, seed) {
   const g = geo.index ? geo.toNonIndexed() : geo.clone(), p = g.attributes.position, map = new Map(), r = mulberry32(seed);
@@ -2925,8 +2950,9 @@ function syncCam() { $('bCam').textContent = `Camera: ${camMode === 'profile' ? 
 function toggleCam() { camMode = camMode === 'profile' ? 'follow' : 'profile'; store.set('gesso-cam', camMode); syncCam(); if (camMode === 'follow') camS.yaw = P.head + Math.PI; toast(camMode === 'profile' ? 'Side camera. Steer with left and right.' : 'Follow camera.', 2.2); }
 $('bCam').addEventListener('click', e => { e.currentTarget.blur(); if (S.started) toggleCam(); });
 syncCam();
-function setPaused(p) { S.paused = p; $('title').hidden = !p; if (p) { $('bStart').textContent = 'Continue'; $('bNew').hidden = false; $('bStart').focus(); save(); } }
+function setPaused(p) { S.paused = p; $('title').hidden = !p; document.body.classList.toggle('titling', p); if (p) { $('bStart').textContent = 'Continue'; $('bNew').hidden = false; $('bStart').focus(); save(); } }
 $('bMenu').addEventListener('click', e => { e.currentTarget.blur(); if (S.started) setPaused(true); });
+document.body.classList.add('titling');   // the game opens on its title plate
 function startGame() {
   if (!S.ready) return; audioInit();
   if (!S.riding) { emit(P.x, P.y + 1.6, P.z, 50, { sp: 6, up: 3, life: 1.3, c: new T.Color(1.6, 1.5, 1.3), s: 1.2 }); W.dogs.forEach((d, i) => { if (d.joined) { d.x = P.x + Math.cos(i * 2.4) * 2.2; d.z = P.z + Math.sin(i * 2.4) * 2.2; d.vx = d.vz = 0; d.hop = 0.2; } }); }
