@@ -75,6 +75,8 @@ body.spreading #hud,body.spreading #tools,body.spreading #touch,body.spreading #
 #title .titlecard::after{display:none}
 #title .titlecard h1{font-size:clamp(34px,3.3vw,58px)}
 #title .titlecard p{font-size:clamp(15px,1.15vw,18px);color:#2f2a20}
+#errandLine{font-family:var(--display);font-style:italic;font-size:16px;color:#2f2a20;margin-top:12px}
+#errandLine b{font-style:normal;font-weight:400;color:var(--seam-ink)}
 .howto{margin:0 0 16px}
 .howto summary{cursor:pointer;font-family:var(--tech);letter-spacing:.14em;font-size:10px;text-transform:uppercase;color:var(--ink-soft);list-style:none;padding:6px 0}
 .howto summary::-webkit-details-marker{display:none}
@@ -160,6 +162,7 @@ body.touch #caption{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
   <span class="lbl">Seams</span><span class="num" id="hSeams">0 / 30</span>
   <span class="lbl">Pack</span><span class="num" id="hPack">2 / 6</span>
   <span class="lbl">Plates</span><span class="num" id="hPlates">0 / 8</span>
+  <span class="lbl">Errand</span><span class="num" id="hErrand">—</span>
 </div>
 <div id="cores" aria-hidden="true">
   <div class="core" id="cPlaster"><svg viewBox="0 0 36 36"><circle class="trk" cx="18" cy="18" r="14"/><circle class="val" cx="18" cy="18" r="14" pathLength="100" stroke-dasharray="100 100" stroke-dashoffset="0"/></svg><span class="lbl">Plaster</span></div>
@@ -233,7 +236,9 @@ body.touch #caption{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
     <div class="btns">
       <button class="btn primary" id="bStart" type="button" disabled>Painting the plain…</button>
       <button class="btn" id="bNew" type="button" hidden>New journey</button>
+      <button class="btn" id="bShare" type="button" hidden>Share survey</button>
     </div>
+    <div class="fine" id="errandLine"></div>
     <div class="fine">On a phone, drag the left side to walk and the right side to look. In a fight, tap Throw, or Still to stop time. Progress saves in this browser.</div>
   </div>
 </div>
@@ -3066,7 +3071,7 @@ function sfxFuse() {
 }
 
 // ================================================================= ui helpers
-const hud = { s: $('hSeams'), p: $('hPack'), pl: $('hPlates') }, hudVals = {};
+const hud = { s: $('hSeams'), p: $('hPack'), pl: $('hPlates'), e: $('hErrand') }, hudVals = {};
 function setHud(el, key, v) { if (hudVals[key] === v) return; const first = hudVals[key] == null; hudVals[key] = v; el.textContent = v; if (!first) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); } }
 const packCount = () => W.dogs.filter(d => d.joined).length;
 function updateHud() {
@@ -3152,12 +3157,12 @@ function finale() {
 function sunSong() {
   // whistle the sun along: by day to the evening, by night to the next dawn, the sky running while the plain stands still
   const f = SKYV.f, tgt = f >= 0.2 && f < 0.55 ? 0.6 : 0.22;
-  S.lapseTo = S.clock + ((tgt - f + 1) % 1) * DAY; S.whistleCD = 2; sfxWhistle(); P.reachT = 1.2; P.cheerT = 1.2;
+  S.lapseTo = S.clock + ((tgt - f + 1) % 1) * DAY; S.whistleCD = 2; sfxWhistle(); P.reachT = 1.2; P.cheerT = 1.2; errand('song');
   const ch = SCORE_E && SCORE_E.chord; if (ch) [1, 2, 3].forEach((k, i) => pluck(ch[k] + 12, 0.3, 0, 0.3 + i * 0.25));
   toast(tgt === 0.22 ? 'Gesso whistles the sun up.' : 'Gesso whistles the evening in.', 3);
 }
 function collect(r) {
-  S.collected.add(r.id); S.marked.delete(r.id); sfxChime(S.collected.size); r.g.visible = false; r.beam.visible = false; P.cheerT = 1.2;
+  S.collected.add(r.id); S.marked.delete(r.id); sfxChime(S.collected.size); r.g.visible = false; r.beam.visible = false; P.cheerT = 1.2; errand('seams');
   emit(r.x, r.y + 1.3, r.z, 40, { sp: 6, up: 4, life: 1.4, c: MINT, s: 1.2 });
   updateHud();
   if (S.collected.size === W.relics.length) showCard('Survey note', 'Every seam is gathered', 'All thirty green seams are in your hands. The plain looks a little more finished than it did.');
@@ -3165,7 +3170,7 @@ function collect(r) {
 }
 function readPlate(i) {
   if (i === 8 && SKYV.night < 0.5) { toast('The stone is blank. Something was written here, but not by daylight.', 3.2); P.reachT = 1; return; }
-  const l = LMx(i), first = !S.plates.has(i); S.plates.add(i); updateHud(); sfxPlate(); if (i === 8) syncLore();
+  const l = LMx(i), first = !S.plates.has(i); S.plates.add(i); updateHud(); sfxPlate(); if (i === 8) syncLore(); errand('plate' + i); if (SKYV.night > 0.5) errand('night');
   let text = l.text + plateDirections(i); if (i === 7 && packCount() === W.dogs.length && !S.steed) text += ' The whole pack is with you now. Stand by the drum and press E.';
   showCard(`Plate ${l.num}${first ? '' : ' · read again'}`, l.name, text, 45, true); P.reachT = 1.2; cineStart(45, 'face'); S.cineA = -1;   // he faces the facing page, as in the painting
   const st = W.steles.find(s => s.lm === i); if (st) S.plateFlood = { x: st.x, z: st.z, first };   // closing the page paints the land around the plate
@@ -3206,9 +3211,9 @@ function interact() {
   if (it.kind === 'stele') readPlate(it.o.lm);
   else if (it.kind === 'lost') joinDog(it.o);
   else if (it.kind === 'plinth') fuse();
-  else if (it.kind === 'note') { const n = it.o; n.n++; n.read = true; showCard('Marginalia · another reader', n.text, `Pencilled in the margin by someone who came this way before you. Read ${n.n} times.`, 8); pageTurn(); }
+  else if (it.kind === 'note') { const n = it.o; n.n++; if (!n.read) errand('notes'); n.read = true; showCard('Marginalia · another reader', n.text, `Pencilled in the margin by someone who came this way before you. Read ${n.n} times.`, 8); pageTurn(); }
   else if (it.kind === 'npc') { const n = it.o; showCard('The Golden Field · crew', n.who[0].toUpperCase() + n.who.slice(1), `“${n.line}”`, 10); tone('triangle', 520, 640, 0.18, 0.04, { att: 0.01 }); }
-  else if (it.kind === 'pet') { const d = it.o; P.petT = 1.6; P.head = Math.atan2(d.x - P.x, d.z - P.z) + 0.25; d.head = Math.atan2(P.x - d.x, P.z - d.z); d.hop = 0.3; d.wagT = 2; sfxYip(); emit(d.x, d.y + 1, d.z, 12, { sp: 2, up: 2, life: 1, c: MINT, s: 0.8 }); }
+  else if (it.kind === 'pet') { errand('pet'); const d = it.o; P.petT = 1.6; P.head = Math.atan2(d.x - P.x, d.z - P.z) + 0.25; d.head = Math.atan2(P.x - d.x, P.z - d.z); d.hop = 0.3; d.wagT = 2; sfxYip(); emit(d.x, d.y + 1, d.z, 12, { sp: 2, up: 2, life: 1, c: MINT, s: 0.8 }); }
 }
 
 // ================================================================= input
@@ -3301,23 +3306,58 @@ function applyQuality() {
 $('bQuality').addEventListener('click', e => { e.currentTarget.blur(); quality = quality === 'high' ? 'light' : 'high'; store.set('gesso-quality', quality); perf.locked = true; applyQuality(); });
 function syncCam() { $('bCam').textContent = `Camera: ${camMode === 'profile' ? 'side' : 'follow'}`; }
 // a plate of your own: the frame as it stands, saved as a picture (the canvas is read in the same task as the render, before it clears)
-function photo() {
-  if (!S.ready || !S.started) return;
-  S.photos = (S.photos || 0) + 1; render(0);
-  const name = `gesso-plate-${String(S.photos).padStart(2, '0')}.jpg`, url = cv.toDataURL('image/jpeg', 0.92);
-  pageTurn();
-  // in the artifact viewer the page may only offer a file through the downloads capability (the viewer confirms); elsewhere, a plain download
+// in the artifact viewer the page may only offer a file through the downloads capability (the viewer confirms); elsewhere, a plain download
+function saveFile(name, url, onOk, onNo) {
   const use = window.claude && typeof window.claude.use === 'function' ? window.claude.use('downloads') : Promise.resolve(null);
   Promise.resolve(use).then(dl => {
-    if (!dl) { const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); toast(`Plate ${S.photos} saved.`, 2.2); return; }
-    return fetch(url).then(r => r.blob()).then(blob => dl.save({ filename: name, data: blob })).then(() => toast(`Plate ${S.photos} saved.`, 2.2)).catch(e => { if (e && e.code === 'declined') S.photos--; else toast('The plate could not be saved here.', 2.5); });
+    if (!dl) { const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); onOk(); return; }
+    return fetch(url).then(r => r.blob()).then(blob => dl.save({ filename: name, data: blob })).then(onOk).catch(e => { if (e && e.code === 'declined') { if (onNo) onNo(); } else toast('It could not be saved here.', 2.5); });
   }).catch(() => {});
 }
+function photo() {
+  if (!S.ready || !S.started) return;
+  S.photos = (S.photos || 0) + 1; render(0); pageTurn();
+  saveFile(`gesso-plate-${String(S.photos).padStart(2, '0')}.jpg`, cv.toDataURL('image/jpeg', 0.92), () => toast(`Plate ${S.photos} saved.`, 2.2), () => S.photos--);
+}
+// the survey card: the book's numbers as a plate of its own, with the view where you stand, to pass around
+function shareCard() {
+  if (!S.ready || !S.started) return;
+  const c = document.createElement('canvas'); c.width = 1200; c.height = 630; const g = c.getContext('2d');
+  g.fillStyle = '#ece3ca'; g.fillRect(0, 0, 1200, 630);
+  for (let i = 0; i < 2600; i++) { g.fillStyle = `rgba(60,50,36,${0.03 + Math.random() * 0.04})`; g.fillRect(Math.random() * 1200, Math.random() * 630, 1.5, 1.5); }   // paper tooth
+  g.fillStyle = '#d9a640'; g.fillRect(0, 0, 1200, 6); g.strokeStyle = 'rgba(42,37,28,.22)'; g.lineWidth = 1; g.strokeRect(14.5, 14.5, 1171, 601);
+  // the view, cropped to the left page
+  S.cardShot = true; try { render(0); } finally { S.cardShot = false; }
+  const sw = cv.width, sh = cv.height, pw = 470, ph = 540, k = Math.max(pw / sw, ph / sh), cw = pw / k, chh = ph / k;
+  g.drawImage(cv, (sw - cw) / 2, (sh - chh) / 2, cw, chh, 40, 45, pw, ph); g.strokeStyle = 'rgba(42,37,28,.35)'; g.strokeRect(40.5, 45.5, pw, ph);
+  // the facing page
+  const x0 = 560, disp = '"IM Fell English","Iowan Old Style",Palatino,Georgia,serif', tech = 'Michroma,"Eurostile",system-ui,sans-serif';
+  g.fillStyle = '#5d5444'; g.font = `11px ${tech}`; g.textBaseline = 'alphabetic';
+  const tag = S.finished ? 'FINISHED' : S.hand ? 'RETOUCHED' : 'IN PROGRESS';
+  g.fillText('A  W A N D E R I N G  G A M E     ·     S U R V E Y  N O .  6  ·  ' + tag.split('').join(' '), x0, 72);
+  g.fillStyle = '#2a251c'; g.font = `italic 54px ${disp}`; g.fillText('Gesso & the Ghost Dogs', x0, 136);
+  g.fillStyle = 'rgba(42,37,28,.28)'; g.fillRect(x0, 158, 600, 1);
+  // the numbers, as filled and empty tesserae
+  const rows = [['Plates', S.plates.size, 9], ['Seams', S.collected.size, W.relics.length], ['Pack', packCount(), W.dogs.length], ['Named ink', S.bosses || 0, BOSS_NAMES.length]];
+  let y = 205;
+  for (const [lbl, v, max] of rows) {
+    g.fillStyle = '#5d5444'; g.font = `10px ${tech}`; g.fillText(lbl.toUpperCase().split('').join(' '), x0, y);
+    g.fillStyle = '#2a251c'; g.font = `30px ${disp}`; g.textAlign = 'right'; g.fillText(`${v} / ${max}`, 1150, y + 2); g.textAlign = 'left';
+    const n = Math.min(max, 30), wdt = Math.min(16, Math.floor(560 / n) - 4);
+    for (let i = 0; i < n; i++) { const on = i < Math.round(v / max * n); g.fillStyle = on ? (lbl === 'Seams' ? '#2c6a56' : lbl === 'Named ink' ? '#a8452b' : '#2a251c') : 'rgba(42,37,28,.14)'; g.fillRect(x0 + i * (wdt + 4), y + 14, wdt, 12); }
+    y += 72;
+  }
+  g.fillStyle = '#5d5444'; g.font = `10px ${tech}`; g.fillText('I N K  W H I T E W A S H E D', x0, y); g.fillText('E R R A N D S  K E P T', x0 + 300, y);
+  g.fillStyle = '#2a251c'; g.font = `30px ${disp}`; g.fillText(String(INK.kills), x0, y + 36); g.fillText(ERR.streak ? `${ERR.streak} day${ERR.streak > 1 ? 's' : ''}` : '—', x0 + 300, y + 36);
+  g.fillStyle = '#5d5444'; g.font = `italic 15px ${disp}`; g.fillText(`${S.plates.has(8) ? 'Nine plates. ' : ''}${S.finished ? 'The painting is finished.' : S.hand ? 'The survey has been retouched.' : 'Ground stays blank until you walk it.'}`, x0, 596);
+  pageTurn(); saveFile('gesso-survey.png', c.toDataURL('image/png'), () => toast('Survey card saved. Pass it on.', 2.6));
+}
+$('bShare').addEventListener('click', e => { e.currentTarget.blur(); shareCard(); });
 $('bPhoto').addEventListener('click', e => { e.currentTarget.blur(); photo(); });
 function toggleCam() { camMode = camMode === 'profile' ? 'follow' : 'profile'; store.set('gesso-cam', camMode); syncCam(); if (camMode === 'follow') camS.yaw = P.head + Math.PI; toast(camMode === 'profile' ? 'Side camera. Steer with left and right.' : 'Follow camera.', 2.2); }
 $('bCam').addEventListener('click', e => { e.currentTarget.blur(); if (S.started) toggleCam(); });
 syncCam();
-function setPaused(p) { S.paused = p; $('title').hidden = !p; document.body.classList.toggle('titling', p); if (p) { $('bStart').textContent = 'Continue'; $('bNew').hidden = false; $('bStart').focus(); save(); } }
+function setPaused(p) { S.paused = p; $('title').hidden = !p; document.body.classList.toggle('titling', p); if (p) { $('bStart').textContent = 'Continue'; $('bNew').hidden = false; $('bShare').hidden = false; $('bStart').focus(); save(); } }
 $('bMenu').addEventListener('click', e => { e.currentTarget.blur(); if (S.started) setPaused(true); });
 document.body.classList.add('titling');   // the game opens on its title plate
 function startGame() {
@@ -3800,7 +3840,7 @@ function hitWraith(w, s, head) {
 }
 function killWraith(w, head) {
   if (INK.token === w) { INK.token = null; INK.tokenT = 0.6; }
-  w.state = 'die'; w.t = 0; w.vx *= 0.3; w.vz *= 0.3; INK.kills++; INK.waveKills++; STILL.meter = Math.min(1, STILL.meter + 0.16);
+  w.state = 'die'; w.t = 0; w.vx *= 0.3; w.vz *= 0.3; INK.kills++; INK.waveKills++; STILL.meter = Math.min(1, STILL.meter + 0.16); errand('ink');
   if (w.boss) { S.bosses = (S.bosses || 0) + 1; banner('Whitewashed', w.boss); STILL.meter = 1; HP.v = 1; sfxFuse(); }
   sfxSplat(w.x, w.z, head); sfxWash(w.x, w.z); flashSight('kill');
 }
@@ -4038,6 +4078,44 @@ function sfxBeat() {
 function sfxReload() { noiseHit(600, 0.8, 0.3, 0.05, 0.1, 0.1); noiseHit(900, 0.8, 0.2, 0.04, 0.1, 0.1, 0.25); }
 function sfxDown() { noiseHit(1500, 0.6, 1.2, 0.1, 0, 0.6); noiseHit(300, 0.7, 0.8, 0.12, 0, 0.5); breath(400, 220, 120, 2.2, 0.08, 2, 0, 0.7, 0.2); }
 
+// ================================================================= today's errand
+// A pop hook on a cult game: each real day the survey sets one small errand, the same for everyone that day, kept in the margin of
+// the title page and on the spec plate. Some errands are the book's own secrets said plainly, so the rumours get started.
+const ERR = { day: 0, type: '', target: 1, n: 0, done: false, streak: 0, last: -1, text: '' };
+const ERRANDS = [
+  r => ({ type: 'seams', target: 3 + Math.floor(r() * 3), text: t => `Gather <b>${t} green seams</b>.` }),
+  r => ({ type: 'ink', target: 3 + Math.floor(r() * 4), text: t => `Whitewash <b>${t} ink</b>.` }),
+  r => { const i = Math.floor(r() * 8); return { type: 'plate' + i, target: 1, text: () => `Read <b>plate ${LM[i].num}, ${LM[i].name}</b>.` }; },
+  r => ({ type: 'notes', target: 2 + Math.floor(r() * 2), text: t => `Read <b>${t} notes</b> in the margins.` }),
+  r => ({ type: 'hand', target: 1, text: () => 'Stand still on the plain <b>until a shadow passes</b>.' }),
+  r => ({ type: 'song', target: 1, text: () => '<b>Whistle three times</b> under the open sky.' }),
+  r => ({ type: 'pet', target: 3, text: t => `Pet the dogs <b>${t} times</b>.` }),
+  r => ({ type: 'night', target: 1, text: () => 'Read any plate <b>by moonlight</b>.' }),
+];
+function errandLoad() {
+  const day = Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 864e5);
+  let st = {}; try { st = JSON.parse(store.get('gesso-errand') || '{}') || {}; } catch (e) {}
+  const r = mulberry32(day * 7919 + 13), e = ERRANDS[Math.floor(r() * ERRANDS.length)](r);
+  ERR.day = day; ERR.type = e.type; ERR.target = e.target; ERR.text = e.text(e.target);
+  ERR.streak = st.streak || 0; ERR.last = st.last != null ? st.last : -1;
+  if (ERR.last < day - 1) ERR.streak = 0;                     // a missed day ends the run
+  const same = st.day === day; ERR.n = same ? st.n || 0 : 0; ERR.done = same ? !!st.done : false;
+  errandSync();
+}
+function errandSave() { store.set('gesso-errand', JSON.stringify({ day: ERR.day, n: ERR.n, done: ERR.done, streak: ERR.streak, last: ERR.last })); }
+function errandSync() {
+  const line = $('errandLine'); if (line) line.innerHTML = ERR.done ? `Today's errand done${ERR.streak > 1 ? ` · <b>${ERR.streak} days</b> kept` : ''}.` : `Today's errand: ${ERR.text}${ERR.target > 1 ? ` <b>${ERR.n} / ${ERR.target}</b>` : ''}`;
+  if (hud.e) setHud(hud.e, 'e', ERR.done ? (ERR.streak > 1 ? `done · ${ERR.streak}d` : 'done') : `${ERR.n} / ${ERR.target}`);
+}
+function errand(type) {
+  if (ERR.done || type !== ERR.type) return;
+  ERR.n = Math.min(ERR.target, ERR.n + 1);
+  if (ERR.n >= ERR.target) {
+    ERR.done = true; ERR.streak = ERR.last === ERR.day - 1 ? ERR.streak + 1 : 1; ERR.last = ERR.day;
+    banner(ERR.streak > 1 ? `${ERR.streak} days kept` : 'Errand done', "Today's survey"); sfxChime(7); sfxChime(9); P.cheerT = 1.2;
+  } else toast(`Errand · ${ERR.n} of ${ERR.target}`, 1.8);
+  errandSave(); errandSync();
+}
 // ================================================================= the painter
 // The plain is still being painted. Stand still for a while in daylight and the shadow of the hand that holds the brush passes
 // over the ground, and where the bristles touch, a stroke of fresh gesso is laid across the plain and dries. It is never announced.
@@ -4065,7 +4143,7 @@ function updateHand(dt, rdt) {
     HAND.next = S.hand ? 240 + Math.random() * 300 : 1e9; HAND.on = true; HAND.t = 0; S.hand = true; syncLore();
     const a = Math.random() * TAU; HAND.dx = Math.cos(a); HAND.dz = Math.sin(a);
     HAND.x0 = P.x - HAND.dx * 48 + (Math.random() - 0.5) * 10; HAND.z0 = P.z - HAND.dz * 48 + (Math.random() - 0.5) * 10; HAND.strokeD = 0;
-    m.visible = true; m.rotation.y = -a + 0.6; sfxHand();
+    m.visible = true; m.rotation.y = -a + 0.6; sfxHand(); errand('hand');
     return;
   }
   HAND.t += dt; const k = HAND.t / HAND.dur, x = HAND.x0 + HAND.dx * 96 * k, z = HAND.z0 + HAND.dz * 96 * k;
@@ -4474,7 +4552,7 @@ function render(dt) {
   hemi.color.copy(sv.top).lerp(sv.hor, 0.5); hemi.groundColor.copy(C('#7a6444')).multiplyScalar(0.6 + 0.4 * (1 - sv.night)); hemi.intensity = sv.hemi;
   _ld.copy(_sunDir.y > 0.02 ? _sunDir : _moonL); if (_sunDir.y <= 0.02 && _sunDir.y > -0.1) _ld.lerpVectors(_moonL, _sunDir, clamp((_sunDir.y + 0.1) / 0.12, 0, 1)).normalize();
   sun.color.copy(sv.sun); sun.intensity = sv.sunI;
-  const hero = !S.started || S.paused, dk = Math.min(1, dt * 3);
+  const hero = (!S.started || S.paused) && !S.cardShot, dk = Math.min(1, dt * 3);
   // title light: a warm studio key, little sky fill (blended so leaving the title does not pop)
   heroK = lerp(heroK, hero ? 1 : 0, dk); spreadK = lerp(spreadK, S.spread ? 1 : 0, dk);
   if (heroK > 0.001) { sun.color.lerp(STG_SUNC, heroK); sun.intensity = lerp(sun.intensity, 1.15, heroK); hemi.intensity = lerp(hemi.intensity, 0.15, heroK); }
@@ -4668,7 +4746,7 @@ async function boot(data) {
   for (const d of W.dogs) d.y = heightAt(d.x, d.z);
   _look.set(P.x, P.y + 1.4, P.z);
   curBiome = biomeCand = biomeAt(P.x, P.z); reveal(P.x, P.z);
-  S.ready = true; applyQuality(); refreshEnv(); updateHud();
+  S.ready = true; applyQuality(); refreshEnv(); updateHud(); errandLoad();
   try { renderer.compile(scene, camera); } catch (e) {}   // the ink's shaders compile now, not at the first encounter
   btn.disabled = false; btn.textContent = loaded ? 'Continue' : 'Begin'; $('bNew').hidden = !loaded;
 }
