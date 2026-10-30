@@ -207,7 +207,7 @@ body.touch #caption{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
   <div class="mapcard">
     <div class="head"><h2>The Ochre Plain</h2><button class="btn" id="mapClose" type="button">Close <kbd>M</kbd></button></div>
     <canvas id="mapc" width="600" height="600"></canvas>
-    <div class="legend">Numerals mark plates you have read. Green lenses are seams your dogs found. Paws are lost dogs you have heard. Ground stays blank until you walk it.</div>
+    <div class="legend">Numerals mark plates you have read. Green lenses are seams your dogs found. Paws are lost dogs you have heard. Ticks are notes you have read. Ground stays an underdrawing until you walk it.</div>
   </div>
 </div>
 
@@ -2523,9 +2523,12 @@ async function buildWorld(progress) {
     const TPL = [() => `${pick(A)} ahead`, () => `${pick(A)}, therefore ${pick(B)}`, () => `try ${pick(B)}`, () => `didn't expect ${pick(A)}`, () => `${pick(A)}?`, () => 'praise the brush', () => `be wary of ${pick(A)}`, () => `time for ${pick(B)}`, () => `${pick(A)} ahead, but ${pick(B)} first`, () => `if only I had ${pick(A)}`, () => 'the hand was here', () => `${pick(A)}… or so I thought`];
     const noteTex = canvasTex(256, 180, (g, w, h) => { g.fillStyle = '#efe6cf'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(60,50,38,.55)'; g.lineWidth = 2; for (let i = 0; i < 5; i++) { g.beginPath(); const y = 34 + i * 26; g.moveTo(26, y); for (let x = 26; x < w - 26; x += 9) g.lineTo(x, y + (rnd() - 0.5) * 7); g.stroke(); } g.strokeStyle = 'rgba(60,50,38,.25)'; g.strokeRect(6, 6, w - 12, h - 12); });
     const nm = new T.MeshStandardMaterial({ map: noteTex, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), ng = new T.PlaneGeometry(0.62, 0.44).rotateX(-Math.PI / 2);
-    const put = (x, z) => { if (at(x, z) < WATER + 0.6 || reserved(x, z, 2)) return; const m = new T.Mesh(ng, nm); m.position.set(x, at(x, z) + 0.03, z); m.rotation.y = rnd() * TAU; m.receiveShadow = true; scene.add(m); W.notes.push({ x, z, text: TPL[Math.floor(rnd() * TPL.length)](), n: 3 + Math.floor(rnd() * 60), m }); };
+    const put = (x, z) => { if (at(x, z) < WATER + 0.6 || reserved(x, z, 2)) return; W.notes.push({ x, z, y: at(x, z) + 0.03, ry: rnd() * TAU, text: TPL[Math.floor(rnd() * TPL.length)](), n: 3 + Math.floor(rnd() * 60) }); };
     for (const st of W.steles) for (let k = 0; k < 2; k++) { const a = rnd() * TAU, r = 5 + rnd() * 8; put(st.x + Math.cos(a) * r, st.z + Math.sin(a) * r); }
     for (let k = 0; k < 40; k++) { const a = rnd() * TAU, r = 60 + rnd() * 560; put(Math.cos(a) * r, Math.sin(a) * r); }
+    const im = new T.InstancedMesh(ng, nm, Math.max(1, W.notes.length)); im.instanceColor = new T.InstancedBufferAttribute(new Float32Array(W.notes.length * 3).fill(1), 3);   // see instanced()
+    W.notes.forEach((n, i) => { _e.set(0, n.ry, 0); _q.setFromEuler(_e); _p.set(n.x, n.y, n.z); _s.set(1, 1, 1); _m4.compose(_p, _q, _s); im.setMatrixAt(i, _m4); });
+    im.receiveShadow = true; im.frustumCulled = false; scene.add(im);
   }
   progress(72); await nextFrame();
 
@@ -2841,6 +2844,7 @@ const MOODS = {
   night: { s: 'night', len: 5.0, dyn: 0.3, mel: 0.4, trem: 5.5 }, ride: { s: 'ride', len: 2.8, dyn: 0.36, mel: 0.5 },
   plate: { s: 'urlicht', len: 4.2, dyn: 0.5, mel: 1, near: true }, fuse: { s: 'rise', len: 4.6, dyn: 0.62, mel: 1, big: true, near: true },
   fight: { s: 'fight', len: 1.5, dyn: 0.48, mel: 0.25, trem: 12, near: true, tight: true },
+  boss: { s: 'fight', len: 1.7, dyn: 0.64, mel: 0.6, trem: 12, near: true, tight: true, big: true },
 };
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
 // a large dark hall: 45 ms pre-delay, early reflections, a 4.6 s tail whose highs die first, left and right decorrelated
@@ -2941,7 +2945,7 @@ async function buildScore(ctx, dest, o = {}) {
 let SCORE_E = null;
 function musicMood() {
   if (!S.started || S.paused) return 'title';
-  if (INK.fight > 0.5) return 'fight';
+  if (INK.fight > 0.5) return INK.list.some(w => w.boss && w.state !== 'die') ? 'boss' : 'fight';
   const f = SKYV.f; if (SKYV.night > 0.5) return 'night'; if (S.riding && P.speed > 7) return 'ride'; if (f > 0.46 && f < 0.6) return 'dusk'; return 'day';
 }
 // offline test render: resolves to a 16-bit stereo WAV data URL of `secs` seconds in a given mood
@@ -3113,7 +3117,7 @@ const MINT = new T.Color(0.5, 1.8, 1.3);
 function whistle() {
   if (S.whistleCD > 0) return;
   S.wh = (S.wh || []).filter(t => S.t - t < 11); S.wh.push(S.t);
-  if (S.wh.length >= 3) { S.wh = []; sunSong(); return; }
+  if (S.wh.length >= 3 && !INK.alert) { S.wh = []; sunSong(); return; }
   if (S.riding) { toast('Dismount with R to send the dogs out.'); return; }
   if (INK.alert && sicPack()) return;
   S.whistleCD = 4; sfxWhistle(); P.reachT = 0.9;
@@ -3193,7 +3197,7 @@ function interact() {
   if (it.kind === 'stele') readPlate(it.o.lm);
   else if (it.kind === 'lost') joinDog(it.o);
   else if (it.kind === 'plinth') fuse();
-  else if (it.kind === 'note') { const n = it.o; n.n++; showCard('Marginalia · another reader', n.text, `Pencilled in the margin by someone who came this way before you. Read ${n.n} times.`, 8); pageTurn(); }
+  else if (it.kind === 'note') { const n = it.o; n.n++; n.read = true; showCard('Marginalia · another reader', n.text, `Pencilled in the margin by someone who came this way before you. Read ${n.n} times.`, 8); pageTurn(); }
   else if (it.kind === 'npc') { const n = it.o; showCard('The Golden Field · crew', n.who[0].toUpperCase() + n.who.slice(1), `“${n.line}”`, 10); tone('triangle', 520, 640, 0.18, 0.04, { att: 0.01 }); }
   else if (it.kind === 'pet') { const d = it.o; P.petT = 1.6; P.head = Math.atan2(d.x - P.x, d.z - P.z) + 0.25; d.head = Math.atan2(P.x - d.x, P.z - d.z); d.hop = 0.3; d.wagT = 2; sfxYip(); emit(d.x, d.y + 1, d.z, 12, { sp: 2, up: 2, life: 1, c: MINT, s: 0.8 }); }
 }
@@ -3338,7 +3342,7 @@ function inkFigureMat(u, alpha) {
     vertexShader: `varying vec2 vP; varying float vZ;
       void main(){ vP = vec2(position.x * ${INK_W.toFixed(2)}, position.y * ${INK_H.toFixed(2)}); vec4 mv = modelViewMatrix * vec4(position, 1.0); vZ = -mv.z; gl_Position = projectionMatrix * mv; }`,
     fragmentShader: `
-      uniform float uTime, uSeed, uAlpha, uSpread, uEye, uDie, uLean, uFogD, uLit, uNight; uniform vec4 uSp[4]; uniform vec3 uFogC;
+      uniform float uTime, uSeed, uAlpha, uSpread, uEye, uDie, uLean, uFogD, uLit, uNight, uBoss; uniform vec4 uSp[4]; uniform vec3 uFogC;
       varying vec2 vP; varying float vZ;
       ${INK_NOISE}
       float cap(vec2 p, vec2 a, vec2 b, float r){ vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h) - r; }
@@ -3351,7 +3355,8 @@ function inkFigureMat(u, alpha) {
         float n1 = fbm(fq), n2 = fbm(fq * 2.2 + 5.3);
         // the figure: a peaked hood, a cloak widening to the hem, long sleeves that hang, or spread wide and high on the windup
         float hood = (length((p - vec2(0.0, 2.3)) / vec2(0.25, 0.32)) - 1.0) * 0.25;
-        hood = smin(hood, cap(p, vec2(0.0, 2.45), vec2(-0.09 - 0.04 * sin(t * 0.7), 2.8), 0.045), 0.1);
+        hood = smin(hood, cap(p, vec2(0.0, 2.45), vec2(-0.09 - 0.04 * sin(t * 0.7), 2.8 + 0.55 * uBoss), 0.045 + 0.02 * uBoss), 0.1);
+        if (uBoss > 0.5) hood = smin(hood, min(cap(p, vec2(-0.2, 2.5), vec2(-0.42, 2.95), 0.035), cap(p, vec2(0.2, 2.5), vec2(0.4, 2.98), 0.035)), 0.08);   // a crown of nibs
         float hw = mix(0.64, 0.33, smoothstep(0.1, 2.1, p.y)) + 0.05 * sin(p.y * 3.1 + t * 0.9);
         float cloak = max(abs(p.x) - hw, p.y - 2.12);
         vec2 sh = vec2(0.3, 1.98), hd = mix(vec2(0.56, 1.0 + 0.06 * sin(t)), vec2(1.1, 2.42), uSpread);
@@ -3393,7 +3398,7 @@ function inkFigureMat(u, alpha) {
         col = mix(col, paper * mix(0.82, 1.0, n2) * mix(uLit, 1.0, 0.25), wsh * max(core, bleed));
         // reserve whites: two slits of bare paper, slanted in
         vec2 e = vec2(abs(p.x) - 0.088, p.y - 2.29), er = vec2(e.x * 0.955 + e.y * 0.296, e.y * 0.955 - e.x * 0.296);
-        float eye = smoothstep(1.0, 0.6, length(er / vec2(0.062, 0.019 + 0.007 * uEye))) * core * (1.0 - wsh);
+        float eye = smoothstep(1.0, 0.6, length(er / (vec2(0.062, 0.019 + 0.007 * uEye) * (1.0 + 0.45 * uBoss)))) * core * (1.0 - wsh);
         col = mix(col, paper * (0.85 + 0.45 * uEye) * (1.0 + 1.3 * uNight), eye);
         a *= 1.0 - smoothstep(n2 - 0.06, n2 + 0.06, smoothstep(0.45, 1.0, uDie) * 1.15);   // the dry whitewash falls away in flakes
         float fg = 1.0 - exp(-uFogD * uFogD * vZ * vZ);
@@ -3446,7 +3451,7 @@ function buildInk() {
   const g = INK.g = new T.Group(); scene.add(g);
   const geo = new T.PlaneGeometry(1, 1).translate(0, 0.5, 0);
   for (let i = 0; i < 6; i++) {
-    const u = { uTime: U.time, uSeed: { value: 0.31 + i * 0.173 }, uSpread: { value: 0 }, uEye: { value: 0.6 }, uDie: { value: 0 }, uLean: { value: 0 },
+    const u = { uTime: U.time, uSeed: { value: 0.31 + i * 0.173 }, uSpread: { value: 0 }, uEye: { value: 0.6 }, uDie: { value: 0 }, uLean: { value: 0 }, uBoss: { value: 0 },
       uSp: { value: [0, 1, 2, 3].map(() => new T.Vector4()) }, uFogC: INKU.uFogC, uFogD: INKU.uFogD, uLit: INKU.uLit, uNight: INKU.uNight };
     const mk = a => { const m = new T.Mesh(geo, inkFigureMat(u, a)); m.renderOrder = 3; m.visible = false; m.scale.set(INK_W, INK_H, 1); g.add(m); return m; };
     INK.pool.push({ body: mk(1), echoes: [mk(0.4), mk(0.2)], u, used: false });
@@ -3911,7 +3916,7 @@ function placeInk(rdt) {
     if (!vis) { v.echoes.forEach(e => { e.visible = false; }); continue; }
     const bob = Math.sin(S.t * 1.7 + w.seed * 9) * 0.06 - 0.05;
     v.body.position.set(w.x, w.y + bob, w.z); v.body.rotation.set(0, Math.atan2(cx - w.x, cz - w.z), 0); v.body.scale.set(INK_W * (w.size || 1), INK_H * w.tall * w.rise, 1);
-    v.body.material.uniforms.uAlpha.value = w.alpha; v.u.uSpread.value = w.spread; v.u.uEye.value = w.eye; v.u.uLean.value = w.lean;
+    v.body.material.uniforms.uAlpha.value = w.alpha; v.u.uSpread.value = w.spread; v.u.uEye.value = w.eye; v.u.uLean.value = w.lean; v.u.uBoss.value = w.boss ? 1 : 0;
     // the smear: where it was a moment ago, fainter, the faster it moves
     const sm = clamp((w.sp - 1.5) / 9, 0, 1) * w.alpha;
     v.echoes.forEach((e, k) => {
@@ -4594,11 +4599,12 @@ function drawMap() {
   const X = x => (x + HALFW) / WORLD * size, Y = z => (z + HALFW) / WORLD * size;
   m.drawImage(mapBase, 0, 0, size, size);
   const fc = fogC.getContext('2d'), im = fc.createImageData(FN, FN);
-  for (let i = 0; i < fog.length; i++) { im.data[i * 4] = 230; im.data[i * 4 + 1] = 221; im.data[i * 4 + 2] = 194; im.data[i * 4 + 3] = fog[i] ? 0 : 244; }
+  for (let i = 0; i < fog.length; i++) { im.data[i * 4] = 226; im.data[i * 4 + 1] = 215; im.data[i * 4 + 2] = 188; im.data[i * 4 + 3] = fog[i] ? 0 : 205; }
   fc.putImageData(im, 0, 0); m.drawImage(fogC, 0, 0, size, size);
   m.strokeStyle = 'rgba(46,41,32,.08)'; m.lineWidth = 1;
   for (let i = 1; i < 8; i++) { m.beginPath(); m.moveTo(i * size / 8, 0); m.lineTo(i * size / 8, size); m.moveTo(0, i * size / 8); m.lineTo(size, i * size / 8); m.stroke(); }
   m.textAlign = 'center'; m.textBaseline = 'middle';
+  for (const n of W.notes) if (n.read && fogAt(n.x, n.z)) { const x = X(n.x), y = Y(n.z); m.strokeStyle = 'rgba(42,37,28,.55)'; m.lineWidth = 1.2; m.beginPath(); m.moveTo(x - 3, y + 1); m.lineTo(x - 1, y + 3); m.lineTo(x + 3, y - 3); m.stroke(); }
   W.steles.forEach(s => {
     if (s.secret && !S.plates.has(8)) return;
     const x = X(s.x), y = Y(s.z), l = LMx(s.lm);
