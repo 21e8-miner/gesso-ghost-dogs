@@ -7,7 +7,7 @@
 :root{
   color-scheme: dark;
   --umber:#1d1912; --paper:#ece3ca; --paper-a:rgba(236,227,202,.9); --paper-hi:#f7f1e0;
-  --ink:#2a251c; --ink-soft:#5d5444; --rule:rgba(42,37,28,.28); --seam:#8fd3b8; --seam-ink:#2c6a56; --signal:#d9a640;
+  --ink:#2a251c; --ink-soft:#5d5444; --rule:rgba(42,37,28,.28); --seam:#8fd3b8; --seam-ink:#2c6a56; --signal:#d9a640; --sanguine:#a8452b;
   --display:"IM Fell English","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
   --tech:"Michroma","Eurostile","Microgramma","Bank Gothic",system-ui,sans-serif;
   --ui:"Alegreya Sans","Gill Sans","Segoe UI",system-ui,sans-serif;
@@ -53,7 +53,7 @@ kbd{font-family:var(--ui);font-weight:700;font-size:.78em;padding:1px 5px;border
 #caption.spread h2{font-size:clamp(30px,3vw,52px);font-style:normal;margin:8px 0 12px}
 #caption.spread p{font-size:clamp(15px,1.15vw,19px);color:#2f2a20}
 @keyframes pagein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-body.spreading #hud,body.spreading #tools,body.spreading #touch,body.spreading #prompt,body.spreading #banner,body.spreading #toast{visibility:hidden}
+body.spreading #hud,body.spreading #tools,body.spreading #touch,body.spreading #prompt,body.spreading #banner,body.spreading #toast,body.spreading #cores,body.spreading #sights,body.spreading #marks{visibility:hidden}
 @media (max-width:899px){ #caption.spread{left:0;right:0;top:auto;bottom:0;width:100%;background:rgba(236,227,202,.95);border-top:3px solid var(--signal);padding:14px 18px calc(16px + env(safe-area-inset-bottom,0px))} #caption.spread h2{font-size:clamp(26px,7vw,36px)} }
 
 #title{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,rgba(20,16,10,.1),rgba(14,11,7,.7));padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));overflow:auto;box-sizing:border-box}
@@ -81,7 +81,7 @@ body.spreading #hud,body.spreading #tools,body.spreading #touch,body.spreading #
 .howto summary::before{content:'+ '}
 .howto[open] summary::before{content:'\2013  '}
 .howto[open] .keys{background:rgba(236,227,202,.86);padding:10px 12px;border:1px solid var(--rule);margin-top:4px}
-body.titling #hud,body.titling #tools,body.titling #touch{visibility:hidden}
+body.titling #hud,body.titling #tools,body.titling #touch,body.titling #cores,body.titling #sights,body.titling #marks{visibility:hidden}
 @media (max-width:899px){
   #title{place-items:end stretch;padding:0}
   #title .titlecard{width:100%;max-height:56vh;overflow:auto;background:rgba(236,227,202,.94);border-top:3px solid var(--signal);padding:14px 18px calc(16px + env(safe-area-inset-bottom,0px));box-shadow:0 -10px 30px rgba(8,6,3,.35)}
@@ -115,7 +115,42 @@ body.touch #prompt{bottom:calc(178px + env(safe-area-inset-bottom,0px))}
 body.touch #toast{bottom:calc(220px + env(safe-area-inset-bottom,0px))}
 body.touch #caption{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 @media (max-width:560px){ #tools .lbl-long{display:none} #hud{gap:1px 10px;padding:6px 10px} #tools{max-width:calc(100vw - 150px)} }
-@media (prefers-reduced-motion: reduce){ #caption{animation:none} #hud .num.flash{animation:none} }
+/* the ink: plaster, Still Life and the hod as three small cores under the spec plate; the sights; Still Life's red-chalk marks */
+#cores{position:fixed;top:calc(98px + env(safe-area-inset-top,0px));left:calc(12px + env(safe-area-inset-left,0px));display:flex;gap:12px;align-items:flex-end;padding:7px 12px 6px;background:var(--paper-a);border:1px solid var(--rule);box-shadow:0 6px 18px rgba(10,8,4,.35);pointer-events:none;opacity:0;transition:opacity .5s}
+#cores.on{opacity:1}
+#cores .core,#cores .hod{display:grid;justify-items:center;gap:2px}
+#cores svg{width:28px;height:28px;display:block;transform:rotate(-90deg);overflow:visible}
+#cores .trk{fill:none;stroke:rgba(42,37,28,.16);stroke-width:3.4}
+#cores .val{fill:none;stroke:var(--ink);stroke-width:3.4;stroke-linecap:round;transition:stroke-dashoffset .2s linear}
+#cStill .val{stroke:var(--sanguine)}
+#cPlaster.low .val{animation:lowcore .9s ease-in-out infinite}
+@keyframes lowcore{50%{stroke:var(--sanguine)}}
+#cores .lbl{font-family:var(--tech);letter-spacing:.14em;font-size:7.5px;text-transform:uppercase;color:var(--ink-soft)}
+#cores .dots{display:flex;gap:3px;height:28px;align-items:center}
+#cores .dots i{width:7px;height:7px;border-radius:50%;border:1px solid var(--ink);background:var(--ink);box-sizing:border-box}
+#cores .dots i.spent{background:transparent;border-color:rgba(42,37,28,.35)}
+#cores.reload .dots i{animation:refill .5s ease-in-out infinite alternate}
+@keyframes refill{to{opacity:.3}}
+#sights{position:fixed;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;pointer-events:none;opacity:0;transition:opacity .18s}
+#sights.on{opacity:1}
+#sights svg{width:100%;height:100%;display:block;overflow:visible}
+#sights .ring{fill:none;stroke:#f4ecd8;stroke-width:1.6;transform-box:fill-box;transform-origin:center}
+#sights .ring2{fill:none;stroke:rgba(20,15,12,.55);stroke-width:3.4}
+#sights .dot{fill:#f4ecd8;stroke:rgba(20,15,12,.6);stroke-width:1}
+#sights .hx{stroke:#f4ecd8;stroke-width:2;stroke-linecap:round;opacity:0}
+#sights.hot .ring{stroke:#eab29c}
+#sights.still .ring{stroke:#cf5d40}
+#sights.hit .hx{animation:hx .24s ease-out}
+#sights.kill .ring{animation:kill .5s ease-out}
+@keyframes hx{0%{opacity:1}100%{opacity:0}}
+@keyframes kill{0%{transform:scale(1)}40%{transform:scale(1.9)}100%{transform:scale(1)}}
+.mark{position:fixed;left:0;top:0;width:26px;height:26px;margin:-13px 0 0 -13px;pointer-events:none}
+.mark svg{width:100%;height:100%;display:block;overflow:visible;filter:drop-shadow(0 0 1px rgba(246,240,223,.7))}
+.mark path{fill:none;stroke:#b1472b;stroke-linecap:round}
+#touch #tThrow{right:calc(98px + env(safe-area-inset-right,0px));bottom:calc(112px + env(safe-area-inset-bottom,0px));width:74px;height:74px;font-size:9.5px}
+#tStill{right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(176px + env(safe-area-inset-bottom,0px))}
+@media (max-width:560px){ #cores{top:calc(86px + env(safe-area-inset-top,0px))} }
+@media (prefers-reduced-motion: reduce){ #caption{animation:none} #hud .num.flash{animation:none} #sights.kill .ring,#cores.reload .dots i,#cPlaster.low .val{animation:none} }
 </style>
 
 <canvas id="game" aria-label="Game world"></canvas>
@@ -125,6 +160,13 @@ body.touch #caption{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
   <span class="lbl">Pack</span><span class="num" id="hPack">2 / 6</span>
   <span class="lbl">Plates</span><span class="num" id="hPlates">0 / 8</span>
 </div>
+<div id="cores" aria-hidden="true">
+  <div class="core" id="cPlaster"><svg viewBox="0 0 36 36"><circle class="trk" cx="18" cy="18" r="14"/><circle class="val" cx="18" cy="18" r="14" pathLength="100" stroke-dasharray="100 100" stroke-dashoffset="0"/></svg><span class="lbl">Plaster</span></div>
+  <div class="core" id="cStill"><svg viewBox="0 0 36 36"><circle class="trk" cx="18" cy="18" r="14"/><circle class="val" cx="18" cy="18" r="14" pathLength="100" stroke-dasharray="100 100" stroke-dashoffset="0"/></svg><span class="lbl">Still</span></div>
+  <div class="hod" id="cHod"><span class="dots"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="lbl">Hod</span></div>
+</div>
+<div id="sights" aria-hidden="true"><svg viewBox="0 0 26 26"><circle class="ring2" cx="13" cy="13" r="7"/><circle class="ring" cx="13" cy="13" r="7"/><circle class="dot" cx="13" cy="13" r="1.6"/><path class="hx" d="M4 4l4.5 4.5M22 4l-4.5 4.5M4 22l4.5-4.5M22 22l-4.5-4.5"/></svg></div>
+<div id="marks" aria-hidden="true"></div>
 <div id="tools">
   <button class="btn" id="bMap" type="button">Map <kbd class="lbl-long">M</kbd></button>
   <button class="btn" id="bGarb" type="button">Garb <kbd class="lbl-long">G</kbd></button>
@@ -148,6 +190,8 @@ body.touch #caption{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
   <button class="tbtn" id="tWhistle" type="button">Whistle</button>
   <button class="tbtn" id="tAct" type="button">Act</button>
   <button class="tbtn" id="tRide" type="button" hidden>Ride</button>
+  <button class="tbtn" id="tThrow" type="button" hidden>Throw</button>
+  <button class="tbtn" id="tStill" type="button" hidden>Still</button>
 </div>
 
 <div id="garbview" hidden>
@@ -170,11 +214,13 @@ body.touch #caption{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
   <div class="titlecard">
     <div class="spec"><span class="eyebrow">A wandering game in eight plates</span><span class="eyebrow">Survey No. 6</span></div>
     <h1>Gesso <i>&amp;</i> the Ghost Dogs</h1>
-    <p>A plaster figure and two ghost dogs cross a painted plain where old machines still roll and ships fly the same loops overhead. Gather the green seams, read the eight plates, and find the four dogs still lost out there.</p>
+    <p>A plaster figure and two ghost dogs cross a painted plain where old machines still roll and ships fly the same loops overhead. Gather the green seams, read the eight plates, and find the four dogs still lost out there. When ink rises out of the plain, whitewash it with gesso.</p>
     <details class="howto"><summary>How to play</summary>
     <dl class="keys">
       <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · <kbd>Shift</kbd></dt><dd>Walk, and hold Shift to run. Drag to look around, scroll to zoom.</dd>
-      <dt><kbd>Space</kbd></dt><dd>Whistle. Your dogs run off and point at the nearest seams.</dd>
+      <dt><kbd>Space</kbd></dt><dd>Whistle. Your dogs run off and point at the nearest seams, or in a fight go for the ink.</dd>
+      <dt>Right mouse · click</dt><dd>Aim over the shoulder and throw gesso. <kbd>F</kbd> throws at the nearest ink.</dd>
+      <dt><kbd>Q</kbd></dt><dd>Still Life. Time nearly stops: sweep the sights across the ink to mark it in red chalk, then click or press Q and every throw lands.</dd>
       <dt><kbd>E</kbd></dt><dd>Read a plate, talk, call a lost dog, pet a dog.</dd>
       <dt><kbd>M</kbd> · <kbd>R</kbd></dt><dd>Open the map · ride, once you have earned it.</dd>
       <dt><kbd>C</kbd></dt><dd>Side camera, like a painting. Steer with left and right.</dd>
@@ -185,7 +231,7 @@ body.touch #caption{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
       <button class="btn primary" id="bStart" type="button" disabled>Painting the plain…</button>
       <button class="btn" id="bNew" type="button" hidden>New journey</button>
     </div>
-    <div class="fine">On a phone, drag the left side to walk and the right side to look. Progress saves in this browser.</div>
+    <div class="fine">On a phone, drag the left side to walk and the right side to look. In a fight, tap Throw, or Still to stop time. Progress saves in this browser.</div>
   </div>
 </div>
 
@@ -748,7 +794,7 @@ const AOPass = T.Pass && FSQ && class extends T.Pass {
     catch (e) { ok = false; this.skipT = 0; }   // something new joined the scene since the last scan: rescan next frame
     sc.overrideMaterial = ov; sc.background = bg; renderer.shadowMap.autoUpdate = sau;
     for (let i = 0; i < sk.length; i++) sk[i].visible = vis[i];
-    this.cMat.uniforms.uK.value = ok && this.aoMat.uniforms.uIntensity.value > 0 ? 0.85 : 0; this.cMat.uniforms.uLine.value = ok ? 0.55 : 0;
+    this.cMat.uniforms.uK.value = ok && this.aoMat.uniforms.uIntensity.value > 0 ? 0.85 : 0; this.cMat.uniforms.uLine.value = ok ? 0.55 * (this.lineK || 1) : 0;
     const ty = Math.tan(cam.fov * Math.PI / 360), u = this.aoMat.uniforms, c = this.cMat.uniforms;
     u.tDepth.value = this.zRT.depthTexture; u.uNear.value = cam.near; u.uFar.value = cam.far; u.uTanY.value = ty; u.uTanX.value = ty * cam.aspect; u.uProjScale.value = 0.5 / ty;
     renderer.setRenderTarget(this.aoRT); this.aoQuad.render(renderer);
@@ -773,12 +819,14 @@ const PainterPass = T.Pass && FSQ && class extends T.Pass {
 };
 const FinalShader = {
   uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uExposure: { value: 1 }, uRes: { value: new T.Vector2(1, 1) },
-    tMask: { value: null }, uMaskOn: { value: 0 }, uMapK: { value: 1 }, uIso: { value: 0 }, uIsoB: { value: 0 }, uTexel: { value: new T.Vector2(1, 1) }, uFocusUV: { value: new T.Vector2(0.5, 0.5) } },
+    tMask: { value: null }, uMaskOn: { value: 0 }, uMapK: { value: 1 }, uIso: { value: 0 }, uIsoB: { value: 0 }, uTexel: { value: new T.Vector2(1, 1) }, uFocusUV: { value: new T.Vector2(0.5, 0.5) },
+    uHurt: { value: 0 }, uHurtP: { value: 0 }, uStill: { value: 0 }, uFade: { value: 0 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse, tMask; uniform float uTime, uExposure, uMaskOn, uIso, uIsoB, uMapK; uniform vec2 uRes, uTexel, uFocusUV; varying vec2 vUv;
+    uniform sampler2D tDiffuse, tMask; uniform float uTime, uExposure, uMaskOn, uIso, uIsoB, uMapK, uHurt, uHurtP, uStill, uFade; uniform vec2 uRes, uTexel, uFocusUV; varying vec2 vUv;
     vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); }
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }
     float mval(vec2 uv){ vec4 s = texture2D(tMask, uv); return max(s.r, s.g * 0.6); }
     vec3 paintMap(float x){
       // stops at luma 16, 48, ... 240: #140f0c #383027 #5a4f3a #7c6f56 #9c9175 #b9b094 #d7ccac #efe9cf
@@ -823,6 +871,33 @@ const FinalShader = {
       vec2 px = vUv * uRes; float weave = (sin(px.x * 1.9) * sin(px.y * 1.9)) * 0.5 + 0.5;
       float tooth = hash(floor(px / 2.0) + floor(uTime * 12.0) * 13.1);
       col *= 1.0 - 0.035 * weave * smoothstep(0.3, 0.9, lg) - 0.03 * (tooth - 0.5);
+      // Still Life: the paint lifts off the drawing underneath, graphite hatching on bare paper laid in by darkness, contours from
+      // the image's own edges; Gesso keeps most of his paint
+      if (uStill > 0.001) {
+        vec2 sp = px + 3.0 * vec2(vn(px / 60.0), vn(px / 60.0 + 9.1));
+        float sc = max(1.0, uRes.y / 900.0), L = dot(col, vec3(0.299, 0.587, 0.114)), dk = 1.0 - L;
+        float h1 = 1.0 - smoothstep(0.08, 0.2, abs(fract((sp.x + sp.y) / (6.0 * sc)) - 0.5));
+        float h2 = 1.0 - smoothstep(0.08, 0.2, abs(fract((sp.x - sp.y) / (6.0 * sc)) - 0.5));
+        float h3 = 1.0 - smoothstep(0.1, 0.22, abs(fract(sp.y / (4.5 * sc)) - 0.5));
+        float hatch = h1 * smoothstep(0.3, 0.5, dk) + h2 * smoothstep(0.5, 0.7, dk) + h3 * smoothstep(0.7, 0.9, dk);
+        // contours only where the picture changes a lot (the depth pencil in the AO pass draws the silhouettes), so the ground's flecks stay quiet
+        vec2 e = uTexel * 2.5 * sc;
+        float gx = dot(texture2D(tDiffuse, vUv + vec2(e.x, 0.0)).rgb - texture2D(tDiffuse, vUv - vec2(e.x, 0.0)).rgb, vec3(0.333));
+        float gy = dot(texture2D(tDiffuse, vUv + vec2(0.0, e.y)).rgb - texture2D(tDiffuse, vUv - vec2(0.0, e.y)).rgb, vec3(0.333));
+        float line = smoothstep(0.22, 0.6, length(vec2(gx, gy)) / (l0 + 0.12)) * 0.8;
+        vec3 paper = vec3(0.93, 0.905, 0.82) * (0.97 + 0.03 * weave), lead = vec3(0.27, 0.26, 0.25);
+        vec3 sk = mix(paper, lead, clamp(hatch * 0.6 + line * 0.85 + dk * dk * 0.35, 0.0, 1.0));
+        col = mix(col, sk, uStill * (1.0 - 0.7 * mk.r));
+      }
+      // hurt: ink seeps in from the edge of the page, a wash with a darker tide-line, fed by each new hit
+      if (uHurt + uHurtP > 0.001) {
+        vec2 q = (vUv - 0.5) * vec2(uRes.x / uRes.y, 1.0);
+        float n = vn(vUv * vec2(7.0, 5.0) + uTime * 0.03) * 0.6 + vn(vUv * 19.0 - uTime * 0.05) * 0.4;
+        float k = clamp(uHurt * 0.62 + uHurtP * 0.35, 0.0, 1.0), r = length(q) + (n - 0.5) * 0.22, r0 = mix(1.05, 0.42, k);
+        float stain = smoothstep(r0, r0 + 0.14, r), tide = exp(-pow((r - r0 - 0.02) / 0.025, 2.0)) * k;
+        col = mix(col, vec3(0.078, 0.059, 0.047), clamp(stain * (0.55 + 0.4 * k) + tide * 0.3, 0.0, 0.95));
+      }
+      col = mix(col, vec3(0.937, 0.914, 0.812), uFade);
       gl_FragColor = vec4(col, 1.0);
       #include <encodings_fragment>
     }`,
@@ -1128,6 +1203,7 @@ const torsoTex = TORSO_S.map, limbTex = LIMB_S.map, headTex = HEAD_S.map;
 // painterly plaster light: warm light wrapping past the terminator, back-light glowing through thin edges, mint rim
 // ---- shared character-light interface (owned by the plaster-shading unit; read by the ghost and staging units)
 const PLU = { uSunV: { value: new T.Vector3(0, 1, 0) }, uSunC: { value: new T.Color(1, 1, 1) }, uKeyV: { value: new T.Vector3(0.6, 0.58, 0.52).normalize() }, uKeyI: { value: 1 }, uKeyTint: { value: new T.Color(1, 1, 1) }, uNight: { value: 0 }, uGroundY: { value: 0 } };
+const CRACKU = { value: 0 };   // Gesso's craquelure: 0 whole, 1 nearly broken through
 // figure metrics shared between the body unit (owner) and the ghost-beast unit (reader): hips pivot height and hips-to-seat drop
 const HIP_Y = 1.02, GESSO_SEAT_DROP = 0.27;
 // updateCharLight(cam, o): o = { sunW: world light dir, sunC: Color (already times intensity), figFwdW: Vector3 figure forward, painterW: 0..1, groundY, night }
@@ -1157,12 +1233,12 @@ const RAMP_TEX = (() => {
 // painted-plaster light: a value ramp driven by the painter key, cast shadows read back from the sun term, darker lower body; no emissive fill, rim or env
 function plasterMat(map, nmap, opt = {}) {
   const m = new T.MeshStandardMaterial({ map, normalMap: nmap || null, normalScale: new T.Vector2(0.7, 0.7), roughness: 0.62, metalness: 0, color: 0xffffff });
-  const uFall = { value: opt.fall === false ? 0 : 1 }; m.userData.uFall = uFall;
+  const uFall = { value: opt.fall === false ? 0 : 1 }; m.userData.uFall = uFall; const uCrack = opt.crack ? CRACKU : { value: 0 };
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, { uRamp: { value: RAMP_TEX }, uKeyV: PLU.uKeyV, uKeyI: PLU.uKeyI, uKeyTint: PLU.uKeyTint, uSunV: PLU.uSunV, uSunC: PLU.uSunC, uNight: PLU.uNight, uGroundY: PLU.uGroundY, uFall });
+    Object.assign(sh.uniforms, { uRamp: { value: RAMP_TEX }, uKeyV: PLU.uKeyV, uKeyI: PLU.uKeyI, uKeyTint: PLU.uKeyTint, uSunV: PLU.uSunV, uSunC: PLU.uSunC, uNight: PLU.uNight, uGroundY: PLU.uGroundY, uFall, uCrack });
     sh.vertexShader = 'varying float vH;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
   vH = (modelMatrix * vec4(transformed, 1.0)).y;`);
-    sh.fragmentShader = 'uniform sampler2D uRamp; uniform vec3 uKeyV; uniform float uKeyI; uniform vec3 uKeyTint; uniform vec3 uSunV; uniform vec3 uSunC; uniform float uNight; uniform float uGroundY; uniform float uFall;\nvarying float vH;\nfloat lum3(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n'
+    sh.fragmentShader = 'uniform sampler2D uRamp; uniform vec3 uKeyV; uniform float uKeyI; uniform vec3 uKeyTint; uniform vec3 uSunV; uniform vec3 uSunC; uniform float uNight; uniform float uGroundY; uniform float uFall; uniform float uCrack;\nvarying float vH;\nfloat lum3(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n'
       + sh.fragmentShader.replace('#include <aomap_fragment>', `#include <aomap_fragment>
       vec3 plLs = normalize(uSunV); float plNls = dot(normal, plLs);
       float plSh = 1.0;
@@ -1197,6 +1273,18 @@ function plasterMat(map, nmap, opt = {}) {
       plSty += plSss * plAlb * uKeyI * uKeyTint * mix(0.45, 1.0, plOcc);
       plSty += diffuseColor.rgb * 0.035 * uNight;
       plSty = min(plSty, vec3(1.1));
+      #ifdef USE_UV
+      if (uCrack > 0.001) {
+        // hurt, the plaster crazes: a Voronoi craquelure, more cells giving way the closer he is to breaking, ink seeping into the fissures
+        vec2 cq = vUv * vec2(9.0, 14.0), cg = floor(cq), cf = fract(cq), cid = vec2(0.0); float c1 = 8.0, c2 = 8.0;
+        for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+          vec2 o = vec2(float(i), float(j)), hh = fract(sin(vec2(dot(cg + o, vec2(127.1, 311.7)), dot(cg + o, vec2(269.5, 183.3)))) * 43758.5453), rr = o + hh - cf; float dd = dot(rr, rr);
+          if (dd < c1) { c2 = c1; c1 = dd; cid = cg + o; } else if (dd < c2) c2 = dd;
+        }
+        float crack = (1.0 - smoothstep(0.02, 0.07, sqrt(c2) - sqrt(c1))) * step(fract(sin(dot(cid, vec2(41.3, 289.1))) * 43758.5453), uCrack * 1.15);
+        plSty = mix(plSty, plSty * vec3(0.18, 0.15, 0.13), crack * 0.85);
+      }
+      #endif
       reflectedLight.directDiffuse = plSty; reflectedLight.indirectDiffuse = vec3(0.0); reflectedLight.directSpecular *= 0.0; reflectedLight.indirectSpecular = vec3(0.0); totalEmissiveRadiance = vec3(0.0);`);
   };
   return m;
@@ -1236,7 +1324,7 @@ const GS = {
   foot: [{ y: 0, r: 0.008 }, { y: -0.012, rx: 0.033, rf: 0.032, rb: 0.026 }, { y: -0.06, rx: 0.04, rf: 0.036, rb: 0.026 }, { y: -0.14, rx: 0.046, rf: 0.026, rb: 0.018 }, { y: -0.21, rx: 0.04, rf: 0.016, rb: 0.011 }, { y: -0.24, r: 0.005 }],
 };
 function buildGesso() {
-  const skin = plasterMat(TORSO_S.map, TORSO_S.nmap), limbM = plasterMat(LIMB_S.map, LIMB_S.nmap), headM = plasterMat(HEAD_S.map, HEAD_S.nmap);
+  const skin = plasterMat(TORSO_S.map, TORSO_S.nmap, { crack: true }), limbM = plasterMat(LIMB_S.map, LIMB_S.nmap, { crack: true }), headM = plasterMat(HEAD_S.map, HEAD_S.nmap, { crack: true });
   headM.vertexColors = true;   // the skull's sockets are shaded in the head geometry's colours
   const plateM = glossPlateMat();
   const mesh = (geo, m) => { const me = new T.Mesh(geo, m); me.castShadow = true; me.receiveShadow = true; return me; };
@@ -1292,7 +1380,7 @@ function buildGesso() {
 }
 function poseGesso(G, o) {
   garbPose(!!o.ride);
-  const p = o.p || 0, amp = o.amp || 0, t = o.t || 0, pet = o.pet || 0, cheer = o.cheer || 0, reach = o.reach || 0, tw = Math.sin(p) * amp;
+  const p = o.p || 0, amp = o.amp || 0, t = o.t || 0, pet = o.pet || 0, cheer = o.cheer || 0, reach = o.reach || 0, tw = Math.sin(p) * amp, aim = o.aim || 0, thr = o.thr || 0, flinch = o.flinch || 0;
   G.hips.position.y = o.ride ? HIP_Y : HIP_Y - Math.abs(Math.sin(p)) * 0.04 * amp + 0.02 * amp + 0.012 - 0.06 * pet;
   G.hips.rotation.y = o.ride ? 0 : 0.1 * tw;
   const br = Math.sin(t * 1.5) * 0.008;
@@ -1319,6 +1407,13 @@ function poseGesso(G, o) {
     if (i === 0 && pet > 0) { sx = lerp(sx, -1.05, pet); ex = lerp(ex, -0.3, pet); wy = lerp(wy, -A.s * Math.PI / 2, pet); wx = lerp(wx, -0.8, pet); }
     const cheering = cheer > 0 && (!o.ride || i === 0);
     if (cheering) { sx = lerp(sx, -2.35, cheer); sz = lerp(sz, A.s * 0.42, cheer); ex = lerp(ex, -0.22, cheer); wy = lerp(wy, A.s * Math.PI / 2, cheer); }
+    // the throw: the right hand cocked overhand by the ear and whipped through on the release, the left arm sighting along the line
+    if (aim > 0) {
+      // (the rig applies z, then y, then x: abduct to the horizontal, then twist so the elbow bends upward, forearm back by the ear)
+      if (i === 0) { sz = lerp(sz, A.s * lerp(1.7, 0.3, thr), aim); sx = lerp(sx, lerp(-1.75, -0.95, thr), aim); sy = lerp(sy, A.s * lerp(0.3, 0, thr), aim); ex = lerp(ex, lerp(-1.7, -0.12, thr), aim); wx = lerp(wx, lerp(0.5, -0.3, thr), aim); wy = lerp(wy, 0, aim); }
+      else { sx = lerp(sx, lerp(-1.45, -0.6, thr), aim); ex = lerp(ex, lerp(-0.15, -0.6, thr), aim); sz = lerp(sz, A.s * 0.04, aim); sy = lerp(sy, -A.s * 0.2, aim); wx = lerp(wx, 0, aim); wy = lerp(wy, -A.s * 1.25, aim); }
+    }
+    if (flinch > 0) { sx -= 0.55 * flinch; ex -= 0.3 * flinch; sz += A.s * 0.25 * flinch; }
     const rch = i === 0 ? reach : 0;
     A.sh.position.set(A.s * 0.2, 0.55 + 0.02 * rch, 0.035 * rch);
     A.sh.rotation.set(sx, sy, sz); A.el.rotation.x = ex; A.wr.rotation.set(wx, wy, 0);
@@ -1326,8 +1421,9 @@ function poseGesso(G, o) {
     const open = clamp(Math.max(rch, i === 0 ? pet : 0, cheering ? cheer : 0, o.ride && i === 1 ? 0.6 : 0), 0, 1);
     A.fingers.forEach((f, k) => { f.p.rotation.z = -A.s * (lerp(0.35, 0.28, open) + k * 0.05); f.d.rotation.z = -A.s * (lerp(0.45, 0.38, open) + k * 0.05); });
   }
-  G.torso.rotation.set((o.lean || 0) + 0.7 * pet - 0.12 * cheer, (o.ride ? 0 : -0.17 * tw) - (o.hero ? 0 : G.arms[0].s * 0.12 * reach), o.roll || 0);
-  G.head.rotation.set((o.ride ? 0.05 : -0.06) + Math.sin(t * 0.7) * 0.02 + (o.lookP || 0) + 0.3 * pet - 0.35 * cheer, o.lookY || 0, -(o.lookY || 0) * 0.22 + Math.sin(t * 0.45) * 0.025 + (o.tilt || 0));
+  const twist = aim * lerp(-0.4, 0.3, thr);
+  G.torso.rotation.set((o.lean || 0) + 0.7 * pet - 0.12 * cheer + aim * lerp(-0.04, 0.2, thr) - 0.3 * flinch, (o.ride ? 0 : -0.17 * tw) - (o.hero ? 0 : G.arms[0].s * 0.12 * reach) + twist + (o.twist || 0), o.roll || 0);
+  G.head.rotation.set((o.ride ? 0.05 : -0.06) + Math.sin(t * 0.7) * 0.02 + (o.lookP || 0) + 0.3 * pet - 0.35 * cheer - 0.25 * flinch, (o.lookY || 0) - twist * 0.8, -(o.lookY || 0) * 0.22 + Math.sin(t * 0.45) * 0.025 + (o.tilt || 0));
 }
 // ---- the wardrobe. Gesso is the plaster ground ancient painters laid before they gilded and painted, so every costume here is
 // drapery sculpted onto him and painted in its era's pigments, the way statues were once coloured. Pieces ride the rig's own
@@ -2592,11 +2688,11 @@ function buildActors() {
 }
 
 // ================================================================= state + save
-const S = { t: 0, clock: DAY * 0.06, started: false, paused: true, ready: false, collected: new Set(), marked: new Set(), plates: new Set(), steed: false, riding: false, whistleCD: 0 };
+const S = { t: 0, clock: DAY * 0.06, started: false, paused: true, ready: false, collected: new Set(), marked: new Set(), plates: new Set(), steed: false, riding: false, whistleCD: 0, timeK: 1 };
 const FN = 80, fog = new Uint8Array(FN * FN);
 let camMode = store.get('gesso-cam') === 'profile' ? 'profile' : 'follow';
 let mapOpen = false, cardOpen = false, cardTimer = 0, muted = store.get('gesso-muted') === '1', quality = store.get('gesso-quality') || 'high';
-const camS = { yaw: 0, pitch: 0.24, dist: 6.2, tdist: 6.2, lastDrag: -10, x: 0, y: 5, z: 20 };
+const camS = { yaw: 0, pitch: 0.24, dist: 6.2, tdist: 6.2, lastDrag: -10, x: 0, y: 5, z: 20, shake: 0 };
 function resetDogs() {
   W.dogs.forEach((d, i) => {
     const h = d.def.home; d.joined = !h; d.state = h ? 'lost' : 'follow'; d.marked = false; d.sit = h ? 1 : 0; d.target = null;
@@ -2606,18 +2702,20 @@ function resetDogs() {
 function resetAll() {
   P.x = PLAYER_START.x; P.z = PLAYER_START.z; P.vx = P.vz = 0; P.head = Math.PI; camS.yaw = 0;
   S.collected.clear(); S.marked.clear(); S.plates.clear(); S.steed = false; S.riding = false; S.clock = DAY * 0.06;
+  INK.kills = 0; INK.seen = false; STILL.meter = 0.75; HP.v = 1; HP.down = 0; if (INK.g) inkClear(); INK.next = 45;
   fog.fill(0); resetDogs();
 }
 const SAVE_KEY = 'gesso-ghost-dogs-v2';
 function serialize() {
   return { v: 2, x: P.x, z: P.z, head: P.head, yaw: camS.yaw, clock: S.clock, seams: [...S.collected], marked: [...S.marked], plates: [...S.plates], steed: S.steed, riding: S.riding,
-    dogs: W.dogs.map(d => d.joined ? 1 : (d.marked ? 2 : 0)), fog: Array.from(fog).join('') };
+    dogs: W.dogs.map(d => d.joined ? 1 : (d.marked ? 2 : 0)), fog: Array.from(fog).join(''), ink: INK.kills, inkSeen: INK.seen, still: Math.round(STILL.meter * 100) / 100 };
 }
 function applySave(s) {
   if (!s || s.v !== 2) return false;
   P.x = s.x; P.z = s.z; P.head = s.head || 0; camS.yaw = s.yaw || 0; S.clock = s.clock || 0;
   S.collected = new Set(s.seams || []); S.marked = new Set(s.marked || []); S.plates = new Set(s.plates || []);
   S.steed = !!s.steed; S.riding = !!s.riding && S.steed;
+  INK.kills = s.ink || 0; INK.seen = !!s.inkSeen; STILL.meter = s.still != null ? clamp(s.still, 0, 1) : 0.75;
   resetDogs();
   (s.dogs || []).forEach((v, i) => { const d = W.dogs[i]; if (!d) return; if (v === 1) { d.joined = true; d.state = 'follow'; d.sit = 0; d.x = P.x - 1 + i * 0.4; d.z = P.z + 1.5; } else if (v === 2) d.marked = true; });
   if (typeof s.fog === 'string' && s.fog.length === fog.length) for (let i = 0; i < fog.length; i++) fog[i] = s.fog.charCodeAt(i) === 49 ? 1 : 0;
@@ -2635,6 +2733,7 @@ const SCORE = {
   landler: { key: 8, prog: [[32, 51, 56, 60], [32, 53, 56, 61], [31, 51, 55, 61], [32, 51, 56, 60], [29, 53, 56, 60], [37, 53, 56, 61], [39, 55, 58, 61], [32, 51, 56, 60]] },
   night: { key: 0, prog: [[36, 51, 55, 60], [36, 51, 56, 60], [36, 53, 56, 60], [35, 50, 55, 62], [36, 51, 55, 60], [37, 53, 56, 61], [31, 50, 53, 59], [36, 51, 55, 60]] },
   ride: { key: 3, prog: [[39, 55, 58, 63], [36, 55, 60, 63], [32, 56, 60, 63], [34, 53, 58, 62], [39, 55, 58, 63], [31, 55, 58, 63], [32, 53, 56, 60], [34, 50, 56, 62]] },
+  fight: { key: 0, prog: [[36, 51, 55, 60], [36, 51, 54, 60], [32, 51, 56, 60], [31, 50, 53, 59], [36, 51, 55, 60], [41, 53, 56, 60], [43, 50, 55, 59], [36, 51, 55, 60]] },
   rise: { key: 6, prog: [[30, 54, 58, 61], [30, 54, 59, 63], [30, 54, 58, 61], [29, 53, 58, 61], [27, 51, 54, 58], [35, 51, 54, 59], [37, 53, 56, 59], [30, 54, 58, 61]] },
 };
 const SCALES = { 0: [0, 2, 3, 5, 7, 8, 10], 1: [1, 3, 5, 6, 8, 10, 0], 3: [3, 5, 7, 8, 10, 0, 2], 6: [6, 8, 10, 11, 1, 3, 5], 8: [8, 10, 0, 1, 3, 5, 7] };
@@ -2642,6 +2741,7 @@ const MOODS = {
   title: { s: 'urlicht', len: 5.2, dyn: 0.3, mel: 0.6 }, day: { s: 'landler', len: 3.8, dyn: 0.32, mel: 0.7 }, dusk: { s: 'urlicht', len: 4.6, dyn: 0.32, mel: 0.6 },
   night: { s: 'night', len: 5.0, dyn: 0.3, mel: 0.4, trem: 5.5 }, ride: { s: 'ride', len: 2.8, dyn: 0.36, mel: 0.5 },
   plate: { s: 'urlicht', len: 4.2, dyn: 0.5, mel: 1, near: true }, fuse: { s: 'rise', len: 4.6, dyn: 0.62, mel: 1, big: true, near: true },
+  fight: { s: 'fight', len: 1.5, dyn: 0.48, mel: 0.25, trem: 12, near: true, tight: true },
 };
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
 // a large dark hall: 45 ms pre-delay, early reflections, a 4.6 s tail whose highs die first, left and right decorrelated
@@ -2733,7 +2833,7 @@ async function buildScore(ctx, dest, o = {}) {
     }
     for (const n of notes) bowString(E, n, n.far ? E.far : n.low ? E.loIn : E.hiIn);
     E.chord = ch[3];
-    E.horizon = t0 + 4 * len + (E.half === 0 ? 7 + rnd() * 9 : 1.2 + rnd() * 1.3);   // the silence after each progression is part of the music
+    E.horizon = t0 + 4 * len + (m.tight ? 0.15 + rnd() * 0.35 : E.half === 0 ? 7 + rnd() * 9 : 1.2 + rnd() * 1.3);   // the silence after each progression is part of the music
   };
   E.tick = () => { while (E.horizon < E.ctx.currentTime + 1.5) E.phrase(); };
   E.event = name => { E.pending = name; if (E.horizon > E.ctx.currentTime + 4) E.horizon = E.ctx.currentTime + 1.5; };
@@ -2742,6 +2842,7 @@ async function buildScore(ctx, dest, o = {}) {
 let SCORE_E = null;
 function musicMood() {
   if (!S.started || S.paused) return 'title';
+  if (INK.fight > 0.5) return 'fight';
   const f = SKYV.f; if (SKYV.night > 0.5) return 'night'; if (S.riding && P.speed > 7) return 'ride'; if (f > 0.46 && f < 0.6) return 'dusk'; return 'day';
 }
 // offline test render: resolves to a 16-bit stereo WAV data URL of `secs` seconds in a given mood
@@ -2757,14 +2858,14 @@ async function renderMusicWav(secs, scenario) {
   const bytes = new Uint8Array(dv.buffer); let bin = ''; for (let i = 0; i < bytes.length; i += 32768) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
   return 'data:audio/wav;base64,' + btoa(bin);
 }
-let AC = null, master = null, ambF = null, rumble = null, whooshBuf = null;
+let AC = null, master = null, ambF = null, rumble = null, whooshBuf = null, musicLP = null;
 function audioInit() {
   if (AC || muted) { if (AC && AC.state === 'suspended') AC.resume(); return; }
   try { AC = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'playback', sampleRate: 48000 }); } catch (e) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e2) { AC = null; return; } }
   master = AC.createGain(); master.gain.value = 0.75; master.connect(AC.destination);
   const amb = AC.createGain(); amb.gain.value = 0.0001; amb.connect(master);
   ambF = AC.createBiquadFilter(); ambF.type = 'lowpass'; ambF.frequency.value = 700; ambF.connect(amb);
-  { const comp = AC.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 2; comp.knee.value = 12; const mg = AC.createGain(); mg.gain.value = 1; comp.connect(mg); mg.connect(master);
+  { const comp = AC.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 2; comp.knee.value = 12; const mg = AC.createGain(); mg.gain.value = 1; musicLP = AC.createBiquadFilter(); musicLP.type = 'lowpass'; musicLP.frequency.value = 20000; musicLP.Q.value = 0.5; comp.connect(musicLP); musicLP.connect(mg); mg.connect(master);
     buildScore(AC, comp, { players: quality === 'light' ? 1 : 2 }).then(E => { SCORE_E = E; setInterval(() => { if (!SCORE_E) return; const md = musicMood(); if (md !== SCORE_E.mood) SCORE_E.mood = md; SCORE_E.tick(); }, 120); }).catch(() => {}); }
   whooshBuf = AC.createBuffer(1, AC.sampleRate * 3, AC.sampleRate); const ch = whooshBuf.getChannelData(0); for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
   const n = AC.createBufferSource(); n.buffer = whooshBuf; n.loop = true;
@@ -2897,6 +2998,7 @@ const MINT = new T.Color(0.5, 1.8, 1.3);
 function whistle() {
   if (S.whistleCD > 0) return;
   if (S.riding) { toast('Dismount with R to send the dogs out.'); return; }
+  if (INK.alert && sicPack()) return;
   S.whistleCD = 4; sfxWhistle(); P.reachT = 0.9;
   const targets = [];
   for (const r of W.relics) if (!S.collected.has(r.id) && !S.marked.has(r.id)) targets.push({ x: r.x, z: r.z, kind: 'relic', ref: r, d: Math.hypot(r.x - P.x, r.z - P.z) });
@@ -2970,16 +3072,19 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyM') { toggleMap(); return; }
   if (e.code === 'KeyG') { toggleGarb(); return; }
   if (mapOpen) return;
-  if (e.code === 'Space' || e.code === 'KeyQ') { e.preventDefault(); whistle(); }
+  if (e.code === 'Space') { e.preventDefault(); whistle(); }
+  else if (e.code === 'KeyQ') { e.preventDefault(); toggleStill(); }
+  else if (e.code === 'KeyF') { e.preventDefault(); snapFire(); }
   else if (e.code === 'KeyE' || e.code === 'Enter') { e.preventDefault(); interact(); }
   else if (e.code === 'KeyR') toggleRide();
   else if (e.code === 'KeyC') toggleCam();
 });
 window.addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) keys[k] = false; });
-window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; joy.active = false; look.id = null; $('joy').hidden = true; });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; joy.active = false; look.id = null; $('joy').hidden = true; AIM.held = false; });
 cv.addEventListener('contextmenu', e => e.preventDefault());
+let lastPtr = 'mouse', clickT = 0, clickD = 0;
 cv.addEventListener('pointerdown', e => {
-  audioInit();
+  audioInit(); lastPtr = e.pointerType; if (e.button === 0) { clickT = cardOpen ? -1e9 : performance.now(); clickD = 0; }   // a click that closes a card is not a throw
   if (e.pointerType === 'touch' && !document.body.classList.contains('touch')) { document.body.classList.add('touch'); $('touch').hidden = false; }
   if (cardOpen && playing()) { hideCard(); }
   if (e.pointerType === 'touch' && e.clientX < window.innerWidth * 0.45 && !joy.active && playing()) {
@@ -2993,16 +3098,25 @@ cv.addEventListener('pointermove', e => {
     let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy; const m = Math.hypot(dx, dy), R = 56; if (m > R) { dx *= R / m; dy *= R / m; }
     joy.x = dx / R; joy.y = dy / R; $('knob').style.transform = `translate(${dx}px,${dy}px)`;
   } else if (e.pointerId === look.id) {
-    const k = e.pointerType === 'touch' ? 0.008 : 0.0055;
-    camS.yaw -= (e.clientX - look.x) * k; camS.pitch = clamp(camS.pitch + (e.clientY - look.y) * k * 0.8, -0.05, 1.25);
+    const k = (e.pointerType === 'touch' ? 0.008 : 0.0055) * (AIM.k > 0.5 ? 0.6 : 1);
+    clickD += Math.abs(e.clientX - look.x) + Math.abs(e.clientY - look.y);
+    camS.yaw -= (e.clientX - look.x) * k; camS.pitch = clamp(camS.pitch + (e.clientY - look.y) * k * 0.8, AIM.k > 0.5 ? -0.42 : -0.05, 1.25);
     look.x = e.clientX; look.y = e.clientY; camS.lastDrag = S.t;
   }
 });
 const endPtr = e => { if (joy.active && e.pointerId === joy.id) { joy.active = false; joy.x = joy.y = 0; $('joy').hidden = true; } if (e.pointerId === look.id) look.id = null; };
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
+// the gun hand: hold the right button to aim over the shoulder and click to throw; a quick click in a fight snaps a throw at the nearest ink
+cv.addEventListener('mousedown', e => {
+  if (lastPtr !== 'mouse' || !playing()) return;
+  if (e.button === 2) { AIM.held = true; if (camMode === 'profile' && AIM.k < 0.5) camS.yaw = P.head + Math.PI; camS.pitch = Math.min(camS.pitch, 0.22); }
+  else if (e.button === 0 && (AIM.held || STILL.on)) { fire(); clickT = -1e9; }   // handled here, so its release is not also a snap throw
+});
+window.addEventListener('mouseup', e => { if (e.button === 2) AIM.held = false; });
+cv.addEventListener('pointerup', e => { if (e.pointerType === 'mouse' && e.button === 0 && !AIM.held && !STILL.on && INK.alert && playing() && performance.now() - clickT < 260 && clickD < 6) snapFire(); });
 cv.addEventListener('wheel', e => { e.preventDefault(); camS.tdist = clamp(camS.tdist * (1 + e.deltaY * 0.0012), 3, 26); }, { passive: false });
 const tap = (id, fn) => $(id).addEventListener('pointerdown', e => { e.preventDefault(); audioInit(); if (playing()) fn(); });
-tap('tWhistle', whistle); tap('tAct', interact); tap('tRide', toggleRide);
+tap('tWhistle', whistle); tap('tAct', interact); tap('tRide', toggleRide); tap('tThrow', snapFire); tap('tStill', toggleStill);
 $('caption').addEventListener('click', hideCard);
 let garbOpen = false;
 function renderGarbList() {
@@ -3057,20 +3171,702 @@ $('bNew').addEventListener('click', () => {
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 
+// ================================================================= the ink
+// In an art book the enemy of gesso is ink. Inkwraiths are sumi strokes standing up out of the plain: a dark core that pools at
+// the edge of the wash, a feathered bleed, a pale halo, tendrils rising like ink dropped in water, and eyes of bare paper the
+// brush never touched. Gesso throws gesso back, wet plaster that whitewashes them, and Still Life (the game's dead eye) stops the
+// painting long enough to mark them in red chalk before every throw lands at once. Hurt, his plaster cracks and ink seeps in from
+// the edge of the page.
+const INK_W = 2.6, INK_H = 3.1, HOD = 6, INK_C = [0.008, 0.006, 0.0048], GESSO_C = [0.82, 0.78, 0.65], GESSO_SPARK = new T.Color(1.25, 1.18, 1.0);
+const INK = { list: [], pool: [], shots: [], blots: [], parts: [], NP: 700, next: 45, fight: 0, token: null, tokenT: 0, kills: 0, seen: false, hod: HOD, reloadT: 0, cd: 0, quietT: 0,
+  thrT: 0, snapT: 0, snapW: 0, seq: 0, wave: 0, waveKills: 0, tipT: 0, alert: false, coresT: 0, inFight: false, quietEnd: false, sight: null, g: null };
+const AIM = { held: false, k: 0 };
+const STILL = { on: false, k: 0, meter: 0.75, marks: [], hoverT: 0, volley: [], volleyT: 0, beatT: 0 };
+const HP = { v: 1, regenT: 0, inv: 0, pulse: 0, down: 0, flinch: 0, recast: false };
+const INKU = { uFogC: { value: new T.Color() }, uFogD: { value: 0.002 }, uLit: { value: 1 }, uNight: { value: 0 } };
+const INK_NOISE = `
+  float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
+  float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a * vn(p); p = p * 2.07 + vec2(3.1, 1.7); a *= 0.5; } return s; }`;
+const INK_TAIL = `
+  #include <tonemapping_fragment>
+  #include <encodings_fragment>`;
+// one wraith: a camera-facing card in figure space (metres, x across, y up from the ground)
+function inkFigureMat(u, alpha) {
+  return new T.ShaderMaterial({
+    uniforms: Object.assign({ uAlpha: { value: alpha } }, u),
+    vertexShader: `varying vec2 vP; varying float vZ;
+      void main(){ vP = vec2(position.x * ${INK_W.toFixed(2)}, position.y * ${INK_H.toFixed(2)}); vec4 mv = modelViewMatrix * vec4(position, 1.0); vZ = -mv.z; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `
+      uniform float uTime, uSeed, uAlpha, uSpread, uEye, uDie, uLean, uFogD, uLit, uNight; uniform vec4 uSp[4]; uniform vec3 uFogC;
+      varying vec2 vP; varying float vZ;
+      ${INK_NOISE}
+      float cap(vec2 p, vec2 a, vec2 b, float r){ vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h) - r; }
+      float smin(float a, float b, float k){ float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0); return mix(b, a, h) - k * h * (1.0 - h); }
+      void main(){
+        float t = uTime * 0.9 + uSeed * 40.0;
+        vec2 p = vP;
+        p.x -= uLean * p.y * 0.2 + sin(t * 1.3) * 0.03 * p.y;                       // leaning into the drift
+        vec2 fq = vec2(p.x * 2.3, p.y * 1.5 - t * 0.5) + uSeed * 11.0;              // ink in water: the whole field rises
+        float n1 = fbm(fq), n2 = fbm(fq * 2.2 + 5.3);
+        // the figure: a peaked hood, a cloak widening to the hem, long sleeves that hang, or spread wide and high on the windup
+        float hood = (length((p - vec2(0.0, 2.3)) / vec2(0.25, 0.32)) - 1.0) * 0.25;
+        hood = smin(hood, cap(p, vec2(0.0, 2.45), vec2(-0.09 - 0.04 * sin(t * 0.7), 2.8), 0.045), 0.1);
+        float hw = mix(0.64, 0.33, smoothstep(0.1, 2.1, p.y)) + 0.05 * sin(p.y * 3.1 + t * 0.9);
+        float cloak = max(abs(p.x) - hw, p.y - 2.12);
+        vec2 sh = vec2(0.3, 1.98), hd = mix(vec2(0.56, 1.0 + 0.06 * sin(t)), vec2(1.1, 2.42), uSpread);
+        float sl = min(cap(p, vec2(-sh.x, sh.y), vec2(-hd.x, hd.y), 0.12), cap(p, sh, hd, 0.12));
+        float d = smin(smin(hood, cloak, 0.13), sl, 0.1);
+        d += (n1 - 0.5) * mix(0.12, 0.36, smoothstep(1.3, 0.15, p.y));             // a ragged, bleeding edge, roughest at the hem
+        // no hem: the cloak frays into strands of ink that drip toward the ground and drift
+        float hem = 0.16 + 0.55 * fbm(vec2(p.x * 3.6 + uSeed * 9.0, t * 0.35)) - 0.42 * smoothstep(0.5, 0.8, vn(vec2(p.x * 10.0 + uSeed * 3.0, t * 0.25)));
+        d = max(d, (hem - p.y) * 0.7);
+        float core = smoothstep(0.035, -0.035, d);
+        float bleed = exp(-max(d, 0.0) * 13.0) * (0.45 + 0.55 * n2) * (1.0 - core);
+        float halo = exp(-max(d, 0.0) * 3.2) * 0.22 * smoothstep(0.3, 0.75, n2);
+        float tq = fbm(vec2(p.x * 6.5 + uSeed * 3.0, p.y * 1.3 - t * 1.05));
+        float tend = smoothstep(0.58, 0.75, tq) * exp(-max(d, 0.0) * 2.4) * smoothstep(1.1, 2.5, p.y) * (1.0 - core);
+        // inside: ink pooled dark at the edge of the wash, paler in the middle, dry-brush streaks running down, two fold strokes
+        float edge = smoothstep(-0.24, -0.01, d);
+        float streak = smoothstep(0.55, 0.85, vn(vec2(p.x * 24.0 + uSeed * 5.0, p.y * 2.0)));
+        float dens = mix(0.8, 1.0, edge) * (1.0 - 0.32 * streak * (1.0 - edge) * smoothstep(0.3, 1.0, p.y));
+        // wet-in-wet blooms: paler cauliflower backruns inside the wash, each with a dark rim where the pigment was pushed
+        float bl = fbm(p * 3.2 + uSeed * 7.0 + vec2(0.0, -t * 0.12));
+        dens = dens * (1.0 - 0.3 * smoothstep(0.6, 0.7, bl) * (1.0 - edge)) + 0.22 * smoothstep(0.52, 0.6, bl) * (1.0 - smoothstep(0.6, 0.66, bl)) * (1.0 - edge);
+        float f1 = abs(p.x + 0.15 - 0.09 * sin(p.y * 2.2 + 1.0)) - mix(0.006, 0.026, smoothstep(2.0, 0.5, p.y));
+        float f2 = abs(p.x - 0.19 - 0.07 * sin(p.y * 2.6 + 2.3)) - mix(0.005, 0.022, smoothstep(2.0, 0.6, p.y));
+        dens = max(dens, smoothstep(0.012, 0.0, min(f1, f2)) * smoothstep(2.08, 1.75, p.y) * smoothstep(0.35, 0.9, p.y) * core);
+        float a = max(core * dens, max(bleed * 0.6, max(halo, tend * 0.55))) * smoothstep(-0.05, 0.3, p.y);
+        vec3 col = mix(vec3(0.085, 0.07, 0.045), vec3(0.0075, 0.0055, 0.0042), smoothstep(0.2, 0.9, a)) * uLit;
+        // whitewash: gesso splats where throws landed, ragged with a spray of drops; dying, the plaster spreads over all of it
+        float wsh = smoothstep(0.0, 0.5, uDie);
+        for (int i = 0; i < 4; i++) {
+          vec4 s = uSp[i];
+          if (s.w > 0.0) {
+            vec2 q = p - s.xy; float r = length(q), an = atan(q.y, q.x);
+            float rad = s.z * (0.72 + 0.4 * vn(vec2(an * 2.3 + float(i) * 7.0, s.x * 5.0 + s.y)));
+            wsh = max(wsh, smoothstep(rad, rad * 0.78, r) * s.w);
+            wsh = max(wsh, step(0.9, vn(q * 24.0 + float(i) * 3.7)) * smoothstep(rad * 2.2, rad, r) * s.w * 0.9);
+          }
+        }
+        vec3 paper = vec3(0.86, 0.82, 0.68);
+        col = mix(col, paper * mix(0.82, 1.0, n2) * mix(uLit, 1.0, 0.25), wsh * max(core, bleed));
+        // reserve whites: two slits of bare paper, slanted in
+        vec2 e = vec2(abs(p.x) - 0.088, p.y - 2.29), er = vec2(e.x * 0.955 + e.y * 0.296, e.y * 0.955 - e.x * 0.296);
+        float eye = smoothstep(1.0, 0.6, length(er / vec2(0.062, 0.019 + 0.007 * uEye))) * core * (1.0 - wsh);
+        col = mix(col, paper * (0.85 + 0.45 * uEye) * (1.0 + 1.3 * uNight), eye);
+        a *= 1.0 - smoothstep(n2 - 0.06, n2 + 0.06, smoothstep(0.45, 1.0, uDie) * 1.15);   // the dry whitewash falls away in flakes
+        float fg = 1.0 - exp(-uFogD * uFogD * vZ * vZ);
+        col = mix(col, uFogC, fg);
+        gl_FragColor = vec4(col, clamp(a, 0.0, 1.0) * uAlpha * (1.0 - fg * 0.5));
+        ${INK_TAIL}
+      }`,
+    transparent: true, depthWrite: false, side: T.DoubleSide, fog: false,
+  });
+}
+// stains on the ground: a wraith's pool, its drips, spent ink blots, and the gesso left where wraiths were whitewashed
+function inkStainMat() {
+  return new T.ShaderMaterial({
+    uniforms: { uFogC: INKU.uFogC, uFogD: INKU.uFogD, uLit: INKU.uLit },
+    vertexShader: `attribute vec4 aSt; varying vec4 vSt; varying vec2 vU; varying float vZ;
+      void main(){ vSt = aSt; vU = uv; vec4 lp = vec4(position, 1.0);
+        #ifdef USE_INSTANCING
+          lp = instanceMatrix * lp;
+        #endif
+        vec4 mv = modelViewMatrix * lp; vZ = -mv.z; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `
+      uniform float uFogD, uLit; uniform vec3 uFogC; varying vec4 vSt; varying vec2 vU; varying float vZ;
+      ${INK_NOISE}
+      void main(){
+        if (vSt.z < 0.004) discard;
+        vec2 q = (vU - 0.5) * 2.0; float r = length(q), an = atan(q.y, q.x), sd = vSt.y * 61.0;
+        vec2 ring = vec2(cos(an), sin(an));
+        float n = fbm(ring * 2.6 + sd), n2 = vn(q * 7.0 + sd);
+        float edge = 0.48 + 0.36 * n + 0.2 * pow(vn(ring * 5.5 + sd * 2.0), 3.0);   // a blot, with fingers where the ink ran
+        float blot = smoothstep(edge, edge - 0.1, r + (n2 - 0.5) * 0.08);
+        float tide = exp(-pow((r - edge + 0.07) / 0.06, 2.0)) * blot;              // the darker tide-line a drying wash leaves
+        float drops = step(0.86, vn(q * 8.0 + sd * 1.7)) * smoothstep(0.98, edge + 0.04, r) * step(edge, r);
+        float a = max(blot, drops * 0.85);
+        vec3 col; float op;
+        if (vSt.x < 0.5) { col = mix(vec3(0.05, 0.04, 0.027), vec3(0.007, 0.005, 0.004), 0.45 + 0.55 * tide); op = a * (0.78 + 0.2 * tide); }
+        else { col = vec3(0.8, 0.76, 0.63) * (0.9 + 0.14 * n2); op = a * (0.82 + 0.18 * tide); }
+        col *= uLit;
+        float fg = 1.0 - exp(-uFogD * uFogD * vZ * vZ); col = mix(col, uFogC, fg);
+        gl_FragColor = vec4(col, op * vSt.z);
+        ${INK_TAIL}
+      }`,
+    transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, fog: false,
+  });
+}
+const SHOT_M = new T.MeshStandardMaterial({ color: C('#efe7cf'), roughness: 0.85, metalness: 0, emissive: C('#f1e8d0'), emissiveIntensity: 0.25 });
+const BLOT_M = new T.MeshBasicMaterial({ color: C('#140f0c') });
+const _ikR = new T.Vector3(1, 0, 0), _ikA = new T.Vector3(), _ikB = new T.Vector3(), _ikO = new T.Vector3(), _ikQ = new T.Quaternion(), _ikQ2 = new T.Quaternion(), _ikN = new T.Vector3(), _ikUp = new T.Vector3(0, 1, 0), _ikM = new T.Matrix4(), _ikS = new T.Vector3();
+function buildInk() {
+  INKU.uFogC.value = scene.fog.color;
+  const g = INK.g = new T.Group(); scene.add(g);
+  const geo = new T.PlaneGeometry(1, 1).translate(0, 0.5, 0);
+  for (let i = 0; i < 6; i++) {
+    const u = { uTime: U.time, uSeed: { value: 0.31 + i * 0.173 }, uSpread: { value: 0 }, uEye: { value: 0.6 }, uDie: { value: 0 }, uLean: { value: 0 },
+      uSp: { value: [0, 1, 2, 3].map(() => new T.Vector4()) }, uFogC: INKU.uFogC, uFogD: INKU.uFogD, uLit: INKU.uLit, uNight: INKU.uNight };
+    const mk = a => { const m = new T.Mesh(geo, inkFigureMat(u, a)); m.renderOrder = 3; m.visible = false; m.scale.set(INK_W, INK_H, 1); g.add(m); return m; };
+    INK.pool.push({ body: mk(1), echoes: [mk(0.4), mk(0.2)], u, used: false });
+  }
+  // the stain field: slots 0-5 are the six wraiths' own pools, the rest are a ring of drips, blots and gesso
+  const SN = 200, sm = new T.InstancedMesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), inkStainMat(), SN), attr = new T.InstancedBufferAttribute(new Float32Array(SN * 4), 4);
+  sm.geometry.setAttribute('aSt', attr); sm.instanceColor = new T.InstancedBufferAttribute(new Float32Array(SN * 3).fill(1), 3);   // see instanced()
+  for (let i = 0; i < SN; i++) { _ikM.makeTranslation(0, -999, 0); sm.setMatrixAt(i, _ikM); }
+  sm.frustumCulled = false; sm.renderOrder = 1; g.add(sm);
+  INK.st = { mesh: sm, attr, n: SN, next: 0, live: [] };
+  // ink in the air: wisps, spatter and gesso flakes (normal blending, so ink can darken what is behind it)
+  const NP = INK.NP, pg = new T.BufferGeometry();
+  pg.setAttribute('position', new T.BufferAttribute(new Float32Array(NP * 3), 3)); pg.setAttribute('acolor', new T.BufferAttribute(new Float32Array(NP * 4), 4)); pg.setAttribute('size', new T.BufferAttribute(new Float32Array(NP), 1));
+  INK.pts = new T.Points(pg, new T.ShaderMaterial({
+    uniforms: { uScale: { value: 1 }, uLit: INKU.uLit },
+    vertexShader: `attribute float size; attribute vec4 acolor; varying vec4 vC; uniform float uScale;
+      void main(){ vC = acolor; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * uScale / max(0.1, -mv.z); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `varying vec4 vC; uniform float uLit;
+      void main(){ vec2 c = gl_PointCoord - 0.5; float a = smoothstep(0.5, 0.18, length(c)) * vC.a; if (a < 0.003) discard; gl_FragColor = vec4(vC.rgb * uLit, a);
+        ${INK_TAIL}
+      }`,
+    transparent: true, depthWrite: false,
+  }));
+  INK.pts.frustumCulled = false; INK.pts.renderOrder = 4; g.add(INK.pts);
+  // thrown gesso, flung ink, and the ball in Gesso's hand while he aims
+  fogPatch(SHOT_M); fogPatch(BLOT_M);
+  const sg = new T.IcosahedronGeometry(0.085, 1);
+  INK.shotPool = Array.from({ length: 16 }, () => { const m = new T.Mesh(sg, SHOT_M); m.visible = false; scene.add(m); return m; });
+  INK.blotPool = Array.from({ length: 10 }, () => { const m = new T.Mesh(sg, BLOT_M); m.scale.setScalar(2.1); m.visible = false; scene.add(m); return m; });
+  G.ball = new T.Mesh(new T.IcosahedronGeometry(0.06, 2), SHOT_M); G.ball.position.set(0.03, -0.085, 0); G.ball.visible = false; G.arms[0].wr.add(G.ball);
+  // depth of field must not see the cards' rectangles
+  if (bokeh) { const br = bokeh.render; bokeh.render = function (...a) { const v = g.visible; g.visible = false; try { br.apply(this, a); } finally { g.visible = v; } }; }
+}
+const inkHittable = w => !!w && (w.state === 'stalk' || w.state === 'windup' || w.state === 'lunge' || w.state === 'recoil' || w.state === 'cast' || w.state === 'stagger' || (w.state === 'rise' && w.t > 0.9));
+const inkFoes = () => INK.list.filter(inkHittable);
+const inkGround = (x, z) => Math.hypot(x, z) < LIMIT - 12 && heightAt(x, z) > WATER + 0.4;
+const isTouch = () => document.body.classList.contains('touch');
+function stainSet(i, x, z, size, kind, a, seed) {
+  const st = INK.st, h = heightAt(x, z), e = 0.6;
+  _ikN.set(heightAt(x - e, z) - heightAt(x + e, z), 2 * e, heightAt(x, z - e) - heightAt(x, z + e)).normalize();
+  _ikQ.setFromUnitVectors(_ikUp, _ikN); _ikQ2.setFromAxisAngle(_ikUp, seed * TAU); _ikQ.multiply(_ikQ2);
+  _ikA.set(x, Math.max(h, WATER) + 0.035, z); _ikS.set(Math.max(size, 0.001), 1, Math.max(size, 0.001)); _ikM.compose(_ikA, _ikQ, _ikS);
+  st.mesh.setMatrixAt(i, _ikM); st.mesh.instanceMatrix.needsUpdate = true; st.attr.setXYZW(i, kind, seed, a, 0); st.attr.needsUpdate = true;
+}
+function addStain(x, z, size, kind, life, a0 = 1) {
+  const st = INK.st, i = 6 + (st.next++ % (st.n - 6)), seed = Math.random();
+  st.live[i] = { life, max: life, a0 }; stainSet(i, x, z, size, kind, a0, seed);
+}
+function inkEmit(x, y, z, n, o) {
+  const L = INK.parts, gy = o.g > 0 ? heightAt(x, z) : -1e9;
+  for (let i = 0; i < n; i++) {
+    if (L.length >= INK.NP) L.shift();
+    const life = o.life * (0.6 + Math.random() * 0.6);
+    L.push({ x, y, z, vx: (Math.random() - 0.5) * o.sp, vy: o.up * (0.3 + Math.random()), vz: (Math.random() - 0.5) * o.sp, life, max: life, c: o.c, a: o.a, s: o.s * (0.6 + Math.random() * 0.8), g: o.g || 0, grow: o.grow || 0, gy });
+  }
+}
+function updateInkParts(dt) {
+  const L = INK.parts, ga = INK.pts.geometry.attributes, pp = ga.position, pc = ga.acolor, ps = ga.size;
+  for (let i = L.length - 1; i >= 0; i--) {
+    const p = L[i]; p.life -= dt; if (p.life <= 0) { L.splice(i, 1); continue; }
+    const dr = 1 - dt * 1.6; p.vy -= p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vx *= dr; p.vz *= dr; if (p.g <= 0) p.vy *= dr;
+    if (p.y < p.gy) { p.y = p.gy + 0.02; p.vx = p.vy = p.vz = 0; p.g = 0; }
+  }
+  for (let i = 0; i < INK.NP; i++) {
+    const p = L[i];
+    if (p) { const k = p.life / p.max; pp.setXYZ(i, p.x, p.y, p.z); pc.setXYZW(i, p.c[0], p.c[1], p.c[2], p.a * Math.min(1, k * 2.5) * Math.min(1, (1 - k) * 12 + 0.25)); ps.setX(i, p.s * (1 + p.grow * (1 - k))); }
+    else ps.setX(i, 0);
+  }
+  pp.needsUpdate = pc.needsUpdate = ps.needsUpdate = true;
+}
+function updateStains(dt) {
+  const st = INK.st; let dirty = false;
+  for (let i = 6; i < st.n; i++) {
+    const s = st.live[i]; if (!s) continue;
+    s.life -= dt; st.attr.setZ(i, Math.max(0, s.a0 * Math.min(1, s.life / Math.min(6, s.max * 0.3)))); dirty = true;
+    if (s.life <= 0) st.live[i] = null;
+  }
+  if (dirty) st.attr.needsUpdate = true;
+}
+// ---- the encounter: ink rises ahead of you, in a loose line across the view, never near a plate
+function spawnWraith(x, z, delay) {
+  const v = INK.pool.find(p => !p.used); if (!v) return null;
+  v.used = true; v.u.uDie.value = 0; v.u.uSpread.value = 0; v.u.uSp.value.forEach(s => s.set(0, 0, 0, 0));
+  const w = { v, x, z, y: heightAt(x, z), vx: 0, vz: 0, hp: 3, state: 'rise', t: -delay, seed: Math.random(), atkCD: 1.5 + Math.random() * 2.5, orbit: Math.atan2(x - P.x, z - P.z),
+    dir: Math.random() < 0.5 ? -1 : 1, spread: 0, eye: 0.4, tall: 1, lean: 0, rise: 0, alpha: 0, sp: 0, hist: [], dripD: 0, wispT: 0, spN: 0, id: ++INK.seq, pool: INK.pool.indexOf(v) };
+  INK.list.push(w); return w;
+}
+function spawnEncounter(n) {
+  const fwd = Math.atan2(-Math.sin(camS.yaw), -Math.cos(camS.yaw));
+  for (let tries = 0; tries < 14; tries++) {
+    const a = fwd + (Math.random() - 0.5) * (tries < 7 ? 1.4 : 4), r = (S.riding ? 70 : 30) + Math.random() * 16;
+    const cx = P.x + Math.sin(a) * r, cz = P.z + Math.cos(a) * r;
+    if (!inkGround(cx, cz) || W.steles.some(s => Math.hypot(s.x - cx, s.z - cz) < 22)) continue;
+    const px = Math.cos(a), pz = -Math.sin(a);
+    let made = 0;
+    for (let k = 0; k < n; k++) {
+      const off = (k - (n - 1) / 2) * 4.2 + (Math.random() - 0.5) * 1.5, back = (Math.random() - 0.5) * 3, x = cx + px * off + Math.sin(a) * back, z = cz + pz * off + Math.cos(a) * back;
+      if (inkGround(x, z) && spawnWraith(x, z, k * 0.45 + Math.random() * 0.2)) made++;
+    }
+    if (made) return made;
+  }
+  return 0;
+}
+function inkDirector(dt, night) {
+  INK.next -= dt * (1 + night);
+  if (INK.next > 0) return;
+  const first = !INK.seen, n = first ? 1 : clamp(1 + Math.floor(Math.random() * (1.5 + night * 2)) + (INK.kills > 8 ? 1 : 0), 1, 4);
+  if (!spawnEncounter(n)) { INK.next = 6; return; }
+  INK.wave = n; INK.waveKills = 0; INK.tipT = first ? 9 : 0; INK.quietEnd = false; INK.coresT = 5; INK.next = lerp(150, 75, night) * (0.75 + Math.random() * 0.5);
+  sfxInkRise();
+  toast(first ? (isTouch() ? 'Ink is rising out of the plain. Tap Throw to fling gesso at it.' : 'Ink is rising out of the plain. Hold the right mouse button to aim, and click to throw gesso.')
+    : night > 0.5 ? 'The ink is bold tonight.' : ['Ink is rising.', 'Ink seeps up through the plain.', 'Something is bleeding through the page.'][Math.floor(Math.random() * 3)], first ? 6 : 2.6);
+}
+// ---- the wraiths: they rise, circle at a distance, and one at a time either spread their sleeves and lunge or flick a blot of ink
+function updateWraiths(dt, calm, night) {
+  const bold = 1 + 0.35 * night, px = P.x, pz = P.z;
+  for (let i = INK.list.length - 1; i >= 0; i--) {
+    const w = INK.list[i]; w.t += dt;
+    const dx = px - w.x, dz = pz - w.z, dist = Math.hypot(dx, dz) || 1, ux = dx / dist, uz = dz / dist;
+    let tx = w.x, tz = w.z, sp = 0, spread = 0, eye = 0.5 + 0.25 * night, tall = 1;
+    if (w.state === 'rise') {
+      w.rise = smooth(clamp((w.t - 0.35) / 1.2, 0, 1)); w.alpha = clamp((w.t - 0.3) / 0.5, 0, 1);
+      if (w.t > 0.35 && !w.burst) { w.burst = true; inkEmit(w.x, w.y + 0.3, w.z, 14, { sp: 2.2, up: 2.4, life: 1.4, c: INK_C, a: 0.5, s: 0.7, g: -0.2, grow: 2 }); }
+      if (w.t > 1.6) { w.state = 'stalk'; w.t = 0; }
+    } else if (w.state === 'stalk') {
+      if (dist > 95) { w.state = 'sink'; w.t = 0; }
+      const R = 8.5 + 3 * w.seed;
+      if (dist > R + 6) { tx = px; tz = pz; sp = dist > 26 ? 7.5 : 4.2 * bold; }
+      else { w.orbit += dt * 0.22 * w.dir * bold; tx = px + Math.sin(w.orbit) * R; tz = pz + Math.cos(w.orbit) * R; sp = 3.2 * bold; }
+      w.atkCD -= dt * bold;
+      if (!calm && w.atkCD <= 0 && !INK.token && INK.tokenT <= 0 && w.t > 0.6) {
+        if (dist < 12) { INK.token = w; w.state = 'windup'; w.t = 0; sfxWindup(w.x, w.z); }
+        else if (dist < 34) { INK.token = w; w.state = 'cast'; w.t = 0; }
+        else w.atkCD = 1;
+      }
+    } else if (w.state === 'windup') {
+      const WU = 0.75 - 0.2 * night, k = clamp(w.t / WU, 0, 1);
+      spread = smooth(k); eye = lerp(eye, 1.9, k); tall = 1 + 0.16 * smooth(k);
+      if (w.t >= WU) { const ax = px + P.vx * 0.3 - w.x, az = pz + P.vz * 0.3 - w.z, m = Math.hypot(ax, az) || 1; w.lx = ax / m; w.lz = az / m; w.state = 'lunge'; w.t = 0; w.hitDone = false; sfxLunge(w.x, w.z); }
+    } else if (w.state === 'lunge') {
+      spread = 1 - 0.6 * smooth(clamp(w.t / 0.5, 0, 1)); eye = 1.9; tall = 1.08;
+      const v = 15 * (1 + 0.15 * night); w.vx = w.lx * v; w.vz = w.lz * v;
+      if (!w.hitDone && dist < (S.riding ? 1.9 : 1.25)) { w.hitDone = true; hurtPlayer((S.riding ? 0.16 : 0.22) * (1 + 0.25 * night), w.lx, w.lz); }
+      for (const d of W.dogs) if (d.joined && !S.riding && !(d.knockT > 0) && Math.hypot(d.x - w.x, d.z - w.z) < 1.1) { d.vx += w.lx * 9 - w.lz * 4; d.vz += w.lz * 9 + w.lx * 4; d.knockT = 1; d.hop = 0.3; sfxWhine(d.x, d.z, 0.05); if (d.state === 'fight') d.biteCD = 1.4; }
+      if (w.t > 0.55) { w.state = 'recoil'; w.t = 0; if (INK.token === w) { INK.token = null; INK.tokenT = 1.6 - 0.5 * night; } w.atkCD = 3.5 + Math.random() * 3; }
+    } else if (w.state === 'recoil') {
+      tx = w.x - ux * 6; tz = w.z - uz * 6; sp = 3.5; spread = 0.25 * Math.max(0, 1 - w.t);
+      if (w.t > 0.9) { w.state = 'stalk'; w.t = 0; }
+    } else if (w.state === 'cast') {
+      const k = clamp(w.t / 0.5, 0, 1); spread = 0.45 * Math.sin(Math.PI * k); eye = lerp(eye, 1.5, k);
+      if (w.t >= 0.5) { castBlot(w, night); w.state = 'stalk'; w.t = 0; if (INK.token === w) { INK.token = null; INK.tokenT = 1.2 - 0.4 * night; } w.atkCD = 3.5 + Math.random() * 3; }
+    } else if (w.state === 'stagger') {
+      eye = 0.3; if (w.t > (w.stgT || 0.55)) { w.state = 'stalk'; w.t = 0; }
+    } else if (w.state === 'die') {
+      w.v.u.uDie.value = clamp(w.t / 1.5, 0, 1); eye = 0;
+      if (w.t > 0.75 && !w.flaked) {
+        w.flaked = true;
+        for (let k = 0; k < 5; k++) { const s = (Math.random() - 0.5) * 0.9, hh = 0.4 + Math.random() * 1.9; inkEmit(w.x + _ikR.x * s, w.y + hh, w.z + _ikR.z * s, 7, { sp: 1.4, up: 0.6, life: 1.6, c: GESSO_C, a: 0.95, s: 0.07, g: 5, grow: 0 }); }
+        emit(w.x, w.y + 1.4, w.z, 16, { sp: 2.4, up: 1.4, life: 1.1, c: GESSO_SPARK, s: 0.5 });
+      }
+      if (w.t > 1.5) { addStain(w.x, w.z, 2.3, 1, 60); freeWraith(w, i); continue; }
+    } else if (w.state === 'sink') {
+      w.rise = 1 - smooth(clamp(w.t / 1.2, 0, 1)); w.alpha = w.rise;
+      if (w.t > 1.2) { freeWraith(w, i); continue; }
+    }
+    if (w.state !== 'lunge') {
+      const ddx = tx - w.x, ddz = tz - w.z, dd = Math.hypot(ddx, ddz), want = dd < 0.3 ? 0 : Math.min(sp, dd * 2), k = Math.min(1, dt * (w.state === 'stagger' ? 2 : 3));
+      w.vx += ((dd > 0 ? ddx / dd * want : 0) - w.vx) * k; w.vz += ((dd > 0 ? ddz / dd * want : 0) - w.vz) * k;
+    }
+    for (const o of INK.list) if (o !== w) { const ox = w.x - o.x, oz = w.z - o.z, od = Math.hypot(ox, oz); if (od < 2.4 && od > 0.01) { w.vx += ox / od * (2.4 - od) * dt * 6; w.vz += oz / od * (2.4 - od) * dt * 6; } }
+    let nx = w.x + w.vx * dt, nz = w.z + w.vz * dt;
+    if (!inkGround(nx, nz)) { nx = w.x; nz = w.z; w.vx *= -0.3; w.vz *= -0.3; }
+    const step = Math.hypot(nx - w.x, nz - w.z); w.x = nx; w.z = nz; w.y = heightAt(w.x, w.z); w.sp = Math.hypot(w.vx, w.vz);
+    w.dripD += step; if (w.dripD > 1.6 && w.state !== 'die') { w.dripD = 0; addStain(w.x + (Math.random() - 0.5) * 0.6, w.z + (Math.random() - 0.5) * 0.6, 0.35 + Math.random() * 0.5, 0, 22, 0.8); }
+    const ek = Math.min(1, dt * 9); w.spread = lerp(w.spread, spread, ek); w.eye = lerp(w.eye, eye, ek); w.tall = lerp(w.tall, tall, ek);
+    w.lean = lerp(w.lean, clamp((w.vx * _ikR.x + w.vz * _ikR.z) / 7, -1, 1), Math.min(1, dt * 5));
+    w.wispT -= dt;
+    if (w.wispT <= 0 && w.state !== 'die' && w.rise > 0.2) { w.wispT = 0.06 + Math.random() * 0.06; const s = (Math.random() - 0.5) * 0.9, hh = (0.6 + Math.random() * 1.7) * w.rise; inkEmit(w.x + _ikR.x * s, w.y + hh, w.z + _ikR.z * s, 1, { sp: 0.3, up: 0.55, life: 1.6, c: INK_C, a: 0.3, s: 0.5, g: -0.15, grow: 1.8 }); }
+    pushHist(w.hist, { t: S.t, x: w.x, y: w.y, z: w.z });
+  }
+  if (INK.tokenT > 0) INK.tokenT -= dt;
+}
+function freeWraith(w, i) {
+  const v = w.v; v.used = false; v.body.visible = false; v.echoes.forEach(e => { e.visible = false; }); v.u.uDie.value = 0; v.u.uSp.value.forEach(s => s.set(0, 0, 0, 0));
+  INK.st.attr.setZ(w.pool, 0); INK.st.attr.needsUpdate = true;
+  if (INK.token === w) INK.token = null;
+  for (const d of W.dogs) if (d.foe === w) d.foe = null;
+  STILL.marks = STILL.marks.filter(m => m.w !== w); STILL.volley = STILL.volley.filter(m => m.w !== w);
+  INK.list.splice(i, 1);
+}
+function castBlot(w, night) {
+  const m = INK.blotPool.find(b => !b.visible); if (!m) return;
+  const ox = w.x + _ikR.x * 0.6, oy = w.y + 2.0 * w.tall, oz = w.z + _ikR.z * 0.6, tof = clamp(Math.hypot(P.x - w.x, P.z - w.z) / 17, 0.6, 2.2);
+  const tx = P.x + P.vx * tof * 0.8, ty = P.y + (S.riding ? 1.9 : 1.1), tz = P.z + P.vz * tof * 0.8, g = 9.8;
+  INK.blots.push({ m, x: ox, y: oy, z: oz, vx: (tx - ox) / tof, vy: (ty - oy) / tof + 0.5 * g * tof, vz: (tz - oz) / tof, life: tof + 1.5, dmg: 0.12 * (1 + 0.3 * night), trT: 0 });
+  m.visible = true; m.position.set(ox, oy, oz); sfxBlot(w.x, w.z);
+}
+function updateBlots(dt) {
+  for (let i = INK.blots.length - 1; i >= 0; i--) {
+    const b = INK.blots[i]; b.life -= dt; b.vy -= 9.8 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+    const hr = Math.hypot(b.x - P.x, b.z - P.z), y0 = P.y + (S.riding ? 0.8 : 0), y1 = P.y + (S.riding ? 3.2 : 1.95);
+    if (HP.down <= 0 && hr < (S.riding ? 1.1 : 0.55) && b.y > y0 && b.y < y1) {
+      const m = Math.hypot(b.vx, b.vz) || 1; hurtPlayer(b.dmg, b.vx / m, b.vz / m);
+      b.m.visible = false; INK.blots.splice(i, 1); continue;
+    }
+    const h = heightAt(b.x, b.z);
+    if (b.y < h || b.life <= 0) {
+      if (b.y < h + 0.5) { addStain(b.x, b.z, 0.8 + Math.random() * 0.5, 0, 26, 0.95); inkEmit(b.x, h + 0.1, b.z, 14, { sp: 3, up: 1.4, life: 0.8, c: INK_C, a: 0.8, s: 0.09, g: 9 }); sfxBlotLand(b.x, b.z); }
+      b.m.visible = false; INK.blots.splice(i, 1); continue;
+    }
+    b.m.position.set(b.x, b.y, b.z);
+    b.trT -= dt; if (b.trT <= 0) { b.trT = 0.03; inkEmit(b.x, b.y, b.z, 1, { sp: 0.2, up: 0.1, life: 0.5, c: INK_C, a: 0.5, s: 0.12, g: 1, grow: 0.5 }); }
+  }
+}
+// ---- Gesso's throw: wet plaster from above the right shoulder, on an arc; aimed, snapped at the nearest ink, or homing in a Still Life volley
+function fireShot(ox, oy, oz, tx, ty, tz, home) {
+  const m = INK.shotPool.find(s => !s.visible); if (!m) return;
+  const dx = tx - ox, dy = ty - oy, dz = tz - oz, d = Math.hypot(dx, dy, dz) || 1, tof = d / 44, g = 9.8 * 0.55;
+  INK.shots.push({ m, x: ox, y: oy, z: oz, vx: dx / tof, vy: dy / tof + 0.5 * g * tof, vz: dz / tof, life: 1.8, home, trT: 0 });
+  m.visible = true; m.position.set(ox, oy, oz);
+}
+function throwAt(tx, ty, tz, home, volley) {
+  G.arms[0].sh.getWorldPosition(_ikO); _ikO.y += 0.28;
+  const ax = tx - _ikO.x, az = tz - _ikO.z, al = Math.hypot(ax, az) || 1; _ikO.x += ax / al * 0.3; _ikO.z += az / al * 0.3;
+  fireShot(_ikO.x, _ikO.y, _ikO.z, tx, ty, tz, home);
+  INK.hod = Math.max(0, INK.hod - 1); INK.cd = volley ? 0 : 0.3; INK.thrT = 0.45; INK.snapT = AIM.k > 0.5 ? 0 : 0.5; INK.quietT = 0; INK.coresT = 4; sfxThrow();
+  if (!S.riding && AIM.k < 0.5) { P.faceA = Math.atan2(ax, az); P.faceT = 0.5; }   // turn into the throw
+  if (INK.hod <= 0) INK.reloadT = 1.3;
+}
+const canThrow = () => playing() && HP.down <= 0 && !cardOpen && S.cineT <= 0 && INK.cd <= 0 && INK.reloadT <= 0 && INK.hod > 0;
+// what the sights are on: the ray through the middle of the screen against each wraith's head, then its body axis
+function sightTarget() {
+  _ikO.copy(camera.position); camera.getWorldDirection(_ikB);
+  let best = null, bt = Infinity;
+  for (const w of INK.list) {
+    if (!inkHittable(w)) continue;
+    const hy = w.y + 2.32 * w.tall * w.rise, t = (w.x - _ikO.x) * _ikB.x + (hy - _ikO.y) * _ikB.y + (w.z - _ikO.z) * _ikB.z;
+    if (t < 1 || t > 90 || t >= bt) continue;
+    const qx = _ikO.x + _ikB.x * t - w.x, qy = _ikO.y + _ikB.y * t - hy, qz = _ikO.z + _ikB.z * t - w.z;
+    if (Math.hypot(qx, qy, qz) < 0.42 + t * 0.006) { bt = t; best = { w, head: true, x: w.x, y: hy, z: w.z }; continue; }
+    const hh = _ikB.x * _ikB.x + _ikB.z * _ikB.z; if (hh < 1e-6) continue;
+    const ta = ((w.x - _ikO.x) * _ikB.x + (w.z - _ikO.z) * _ikB.z) / hh, ry = _ikO.y + _ikB.y * ta - w.y, hd = Math.hypot(_ikO.x + _ikB.x * ta - w.x, _ikO.z + _ikB.z * ta - w.z);
+    if (ta > 1 && ta < bt && ry > 0.3 && ry < 2.12 * w.tall * w.rise && hd < lerp(0.62, 0.4, clamp(ry / 2.1, 0, 1)) + 0.15) { bt = ta; best = { w, head: false, x: w.x, y: w.y + ry, z: w.z }; }
+  }
+  return best;
+}
+function fire() {
+  if (STILL.on) { releaseStill(); return; }
+  if (!canThrow()) return;
+  const s = INK.sight || sightTarget();
+  if (s) { const tof = Math.hypot(s.x - P.x, s.z - P.z) / 44; throwAt(s.x + s.w.vx * tof, s.y, s.z + s.w.vz * tof, null); return; }
+  // nothing under the sights: the throw goes where the ray meets the ground, or far along it
+  _ikO.copy(camera.position); camera.getWorldDirection(_ikB);
+  let px = _ikO.x + _ikB.x * 60, py = _ikO.y + _ikB.y * 60, pz = _ikO.z + _ikB.z * 60;
+  for (let t = 4; t < 90; t += 1.5) { const x = _ikO.x + _ikB.x * t, y = _ikO.y + _ikB.y * t, z = _ikO.z + _ikB.z * t; if (y < heightAt(x, z)) { px = x; py = y; pz = z; break; } }
+  throwAt(px, py, pz, null);
+}
+function snapTarget() {
+  const fx = -Math.sin(camS.yaw), fz = -Math.cos(camS.yaw); let best = null, bs = Infinity, near = null, nd = 22;
+  for (const w of INK.list) {
+    if (!inkHittable(w)) continue;
+    const dx = w.x - P.x, dz = w.z - P.z, d = Math.hypot(dx, dz) || 1, ang = Math.acos(clamp((dx * fx + dz * fz) / d, -1, 1));
+    if (d < 50 && ang < 0.9 && ang * 20 + d < bs) { bs = ang * 20 + d; best = w; }
+    if (d < nd) { nd = d; near = w; }
+  }
+  return best || near;
+}
+function snapFire() {
+  if (STILL.on) { releaseStill(); return; }
+  if (AIM.k > 0.5) { fire(); return; }
+  if (!canThrow()) return;
+  const w = snapTarget();
+  if (w) { const tof = Math.hypot(w.x - P.x, w.z - P.z) / 44; throwAt(w.x + w.vx * tof, w.y + 1.35 * w.tall, w.z + w.vz * tof, null); return; }
+  const h = S.riding ? P.head : (camMode === 'profile' ? P.head : camS.yaw + Math.PI), x = P.x + Math.sin(h) * 24, z = P.z + Math.cos(h) * 24;
+  throwAt(x, heightAt(x, z) + 0.6, z, null);
+}
+function updateShots(dt) {
+  for (let i = INK.shots.length - 1; i >= 0; i--) {
+    const s = INK.shots[i]; s.life -= dt;
+    let hit = null, head = false, ground = false;
+    for (let k = 0; k < 3 && !hit && !ground; k++) {
+      const h = dt / 3, hm = s.home;
+      if (hm && inkHittable(hm.w)) {
+        const w = hm.w, hy = w.y + (hm.head ? 2.32 * w.tall * w.rise : 1.4), ax = w.x - s.x, ay = hy - s.y, az = w.z - s.z, ad = Math.hypot(ax, ay, az) || 1, v = Math.max(30, Math.hypot(s.vx, s.vy, s.vz)), kk = Math.min(1, h * 14);
+        s.vx += (ax / ad * v - s.vx) * kk; s.vy += (ay / ad * v - s.vy) * kk; s.vz += (az / ad * v - s.vz) * kk;
+      } else s.vy -= 9.8 * 0.55 * h;
+      s.x += s.vx * h; s.y += s.vy * h; s.z += s.vz * h;
+      for (const w of INK.list) {
+        if (!inkHittable(w)) continue;
+        const hr = Math.hypot(s.x - w.x, s.z - w.z), ry = s.y - w.y;
+        if (Math.hypot(hr, ry - 2.32 * w.tall * w.rise) < 0.3) { hit = w; head = true; break; }
+        if (ry > 0.25 && ry < 2.12 * w.tall * w.rise && hr < lerp(0.62, 0.4, clamp(ry / 2.1, 0, 1))) { hit = w; break; }
+      }
+      if (!hit && s.y < heightAt(s.x, s.z)) ground = true;
+    }
+    if (hit || ground || s.life <= 0) {
+      if (hit) hitWraith(hit, s, head);
+      else if (ground) { const gy = heightAt(s.x, s.z); addStain(s.x, s.z, 0.55 + Math.random() * 0.35, 1, 30); inkEmit(s.x, gy + 0.1, s.z, 10, { sp: 2.4, up: 1.3, life: 0.8, c: GESSO_C, a: 0.9, s: 0.07, g: 9 }); emit(s.x, gy + 0.2, s.z, 5, { sp: 2, up: 1, life: 0.5, c: GESSO_SPARK, s: 0.4 }); sfxSplat(s.x, s.z, false, true); }
+      s.m.visible = false; INK.shots.splice(i, 1); continue;
+    }
+    s.m.position.set(s.x, s.y, s.z); _ikA.set(s.x + s.vx, s.y + s.vy, s.z + s.vz); s.m.lookAt(_ikA); s.m.scale.set(1, 1, 2.4);   // stretched along its flight
+    s.trT -= dt; if (s.trT <= 0) { s.trT = 0.016; emit(s.x, s.y, s.z, 1, { sp: 0.2, up: 0.05, life: 0.35, c: GESSO_SPARK, s: 0.3 }); }
+  }
+}
+function flashSight(c) { const el = coreEl.sights; el.classList.remove(c); void el.offsetWidth; el.classList.add(c); }
+function hitWraith(w, s, head) {
+  const fx = (s.x - w.x) * _ikR.x + (s.z - w.z) * _ikR.z, fy = (s.y - w.y) / Math.max(0.3, w.tall * w.rise);
+  w.spN = (w.spN + 1) % 4; w.v.u.uSp.value[w.spN].set(clamp(fx, -0.7, 0.7), clamp(fy, 0.3, 2.6), head ? 0.27 : 0.21, 1);
+  w.hp -= head ? 3 : 1; STILL.meter = Math.min(1, STILL.meter + 0.05);
+  emit(s.x, s.y, s.z, 10, { sp: 3.2, up: 1.5, life: 0.7, c: GESSO_SPARK, s: 0.55 });
+  inkEmit(s.x, s.y, s.z, 16, { sp: 3.5, up: 1.6, life: 0.9, c: INK_C, a: 0.8, s: 0.09, g: 9, grow: 0.2 });   // ink knocked loose
+  inkEmit(s.x, s.y, s.z, 10, { sp: 2.4, up: 1.2, life: 1.1, c: GESSO_C, a: 0.9, s: 0.07, g: 9 });            // and plaster drops
+  flashSight('hit');
+  if (w.hp <= 0) { killWraith(w, head); return; }
+  if (INK.token === w) { INK.token = null; INK.tokenT = 0.5; }
+  const m = Math.hypot(s.vx, s.vz) || 1; w.state = 'stagger'; w.t = 0; w.stgT = 0.5; w.vx = s.vx / m * 4; w.vz = s.vz / m * 4;
+  sfxSplat(w.x, w.z, false);
+}
+function killWraith(w, head) {
+  if (INK.token === w) { INK.token = null; INK.tokenT = 0.6; }
+  w.state = 'die'; w.t = 0; w.vx *= 0.3; w.vz *= 0.3; INK.kills++; INK.waveKills++; STILL.meter = Math.min(1, STILL.meter + 0.16);
+  sfxSplat(w.x, w.z, head); sfxWash(w.x, w.z); flashSight('kill');
+}
+function biteWraith(d, w) {
+  w.hp = Math.max(1, w.hp - 1);   // the pack pins the ink; it takes gesso to wash it out
+  if (INK.token === w) { INK.token = null; INK.tokenT = 0.5; }
+  const a = Math.atan2(w.x - d.x, w.z - d.z); w.state = 'stagger'; w.t = 0; w.stgT = 1.0; w.vx = Math.sin(a) * 3; w.vz = Math.cos(a) * 3;
+  d.hop = 0.35; d.wagT = 0.4;
+  inkEmit(w.x, w.y + 1.0, w.z, 16, { sp: 3, up: 1.8, life: 1.1, c: INK_C, a: 0.7, s: 0.12, g: 6, grow: 0.5 });
+  sfxBite(w.x, w.z);
+}
+function sicPack() {
+  const foes = inkFoes().sort((a, b) => Math.hypot(a.x - P.x, a.z - P.z) - Math.hypot(b.x - P.x, b.z - P.z)), pack = W.dogs.filter(d => d.joined && d.state !== 'lost');
+  if (!foes.length || !pack.length) return false;
+  S.whistleCD = 2.5; sfxWhistle(); P.reachT = 0.9;
+  pack.forEach((d, k) => { d.state = 'fight'; d.foe = foes[k % Math.min(foes.length, 2)]; d.biteCD = 0; d.hop = 0.25; d.target = null; d.barkT = Math.random(); d.fightT = 12; });
+  toast(pack.length === 1 ? `${pack[0].name} goes for the ink.` : `${pack.slice(0, -1).map(d => d.name).join(', ')} and ${pack[pack.length - 1].name} go for the ink.`, 2.4);
+  return true;
+}
+// ---- plaster: hits crack him, the cracks set again out of the fight; broken through, he is recast at the nearest plate he has read
+function hurtPlayer(dmg, dx, dz) {
+  if (HP.inv > 0 || HP.down > 0) return false;
+  HP.v = Math.max(0, HP.v - dmg); HP.inv = 0.7; HP.regenT = 5; HP.pulse = 1; HP.flinch = 1; camS.shake = 0.6; INK.coresT = 4;
+  P.vx += dx * 6; P.vz += dz * 6;
+  const gy = (S.riding ? G.root.position.y : P.y) + 1.3;
+  inkEmit(P.x, gy, P.z, 28, { sp: 4, up: 2, life: 0.9, c: INK_C, a: 0.85, s: 0.1, g: 9, grow: 0.3 });
+  emit(P.x, gy, P.z, 8, { sp: 3, up: 2, life: 0.6, c: GESSO_SPARK, s: 0.4 });
+  sfxHurt();
+  if (HP.v <= 0) gessoDown();
+  return true;
+}
+function gessoDown() {
+  HP.down = 3.2; HP.recast = false; AIM.held = false; INK.quietEnd = true;
+  if (STILL.on) { STILL.on = false; musicDuck(false); } STILL.marks.length = 0; STILL.volley.length = 0;
+  for (const w of INK.list) if (w.state !== 'die') { w.state = 'sink'; w.t = 0; if (INK.token === w) INK.token = null; }
+  const gy = (S.riding ? G.root.position.y : P.y);
+  for (let k = 0; k < 6; k++) inkEmit(P.x + (Math.random() - 0.5) * 0.5, gy + 0.3 + k * 0.3, P.z + (Math.random() - 0.5) * 0.5, 6, { sp: 1.8, up: 0.8, life: 1.6, c: GESSO_C, a: 0.95, s: 0.08, g: 6 });
+  sfxDown(); toast('The ink cracked him through. Gesso is recast in fresh plaster.', 4.5);
+}
+function recast() {
+  let best = null, bd = Infinity;
+  for (const s of W.steles) if (S.plates.has(s.lm)) { const d = Math.hypot(s.x - P.x, s.z - P.z); if (d < bd) { bd = d; best = s; } }
+  P.x = best ? best.x + 3 : PLAYER_START.x; P.z = best ? best.z + 3 : PLAYER_START.z; P.y = heightAt(P.x, P.z); P.vx = P.vz = 0; HP.v = 1; HP.regenT = 0;
+  camS.yaw = P.head + Math.PI; camS.x = P.x + Math.sin(camS.yaw) * 7; camS.z = P.z + Math.cos(camS.yaw) * 7; camS.y = P.y + 4; _look.set(P.x, P.y + 1.4, P.z);
+  W.dogs.forEach((d, i) => { if (!d.joined) return; d.x = P.x + Math.cos(i * 2.4) * 2.2; d.z = P.z + Math.sin(i * 2.4) * 2.2; d.vx = d.vz = 0; d.state = 'follow'; d.foe = null; });
+  inkClear(); INK.next = 70 + Math.random() * 40; reveal(P.x, P.z);
+}
+function inkClear() {
+  while (INK.list.length) freeWraith(INK.list[INK.list.length - 1], INK.list.length - 1);
+  for (const s of INK.shots) s.m.visible = false; for (const b of INK.blots) b.m.visible = false; INK.shots.length = INK.blots.length = 0;
+  INK.token = null; INK.hod = HOD; INK.reloadT = 0; INK.parts.length = 0;
+}
+// ---- Still Life: the painting holds still; the sights paint red-chalk marks on the ink they cross, then every throw lands
+function toggleStill() {
+  if (STILL.on) { releaseStill(); return; }
+  if (!playing() || HP.down > 0 || cardOpen) return;
+  if (STILL.meter < 0.15) { toast('Still Life is spent. Whitewash some ink to fill it again.', 2.4); return; }
+  STILL.on = true; STILL.marks.length = 0; STILL.volley.length = 0; STILL.hoverT = 0; STILL.beatT = 0.3; INK.coresT = 4;
+  if (camMode === 'profile' && AIM.k < 0.5) camS.yaw = P.head + Math.PI;
+  camS.pitch = Math.min(camS.pitch, 0.22);
+  if (INK.hod <= 0 || INK.reloadT > 0) { INK.hod = HOD; INK.reloadT = 0; }
+  sfxStillIn(); musicDuck(true);
+  if (isTouch()) {
+    // no sights to sweep on a phone: everything in view is marked, nearest first
+    const foes = inkFoes().sort((a, b) => Math.hypot(a.x - P.x, a.z - P.z) - Math.hypot(b.x - P.x, b.z - P.z));
+    for (const w of foes) { if (STILL.marks.length >= INK.hod) break; _ikA.set(w.x, w.y + 2.3, w.z).project(camera); if (_ikA.z < 1 && Math.abs(_ikA.x) < 1.05 && Math.abs(_ikA.y) < 1.05) { STILL.marks.push({ w }); sfxMark(STILL.marks.length * 0.12); } }
+  }
+}
+function releaseStill() {
+  if (!STILL.on) return;
+  STILL.on = false; musicDuck(false); sfxStillOut();
+  if (STILL.marks.length) { STILL.volley = STILL.marks.slice(); STILL.volleyT = 0.05; }
+  STILL.marks.length = 0;
+}
+function updateStill(dt, rdt) {
+  const volley = STILL.volley.length > 0 || INK.shots.some(s => s.home), want = STILL.on ? 0.14 : volley ? 0.4 : 1;   // the volley flies in slow motion until it lands
+  S.timeK = lerp(S.timeK, want, Math.min(1, rdt * (want < S.timeK ? 10 : 4))); if (Math.abs(S.timeK - want) < 0.004) S.timeK = want;
+  STILL.k = lerp(STILL.k, STILL.on ? 1 : 0, Math.min(1, rdt * (STILL.on ? 7 : 2.6))); if (STILL.k < 0.002) STILL.k = 0;
+  if (STILL.on) {
+    STILL.meter = Math.max(0, STILL.meter - rdt * 0.2);
+    if (!playing() || HP.down > 0) { STILL.on = false; STILL.marks.length = 0; musicDuck(false); }
+    else if (STILL.meter <= 0) releaseStill();
+    else {
+      const s = INK.sight;
+      if (s && STILL.marks.length < INK.hod && !STILL.marks.some(m => m.w === s.w)) { STILL.hoverT += rdt; if (STILL.hoverT > 0.06) { STILL.marks.push({ w: s.w }); STILL.hoverT = 0; sfxMark(0); } }
+      else STILL.hoverT = 0;
+      STILL.beatT -= rdt; if (STILL.beatT <= 0) { STILL.beatT = 0.82; sfxBeat(); }
+    }
+  } else STILL.meter = Math.min(1, STILL.meter + dt * 0.005);
+  if (STILL.volley.length) {
+    STILL.volleyT -= rdt;
+    if (STILL.volleyT <= 0) { const m = STILL.volley.shift(), w = m.w; STILL.volleyT = 0.12; if (inkHittable(w) && INK.hod > 0) throwAt(w.x, w.y + 2.32 * w.tall * w.rise, w.z, { w, head: true }, true); }
+  }
+}
+function updateInk(dt, rdt) {
+  const live = playing(), calm = !live || cardOpen || S.cineT > 0 || HP.down > 0 || garbOpen, night = SKYV.night;
+  INKU.uLit.value = lerp(1, 0.42, night); INKU.uNight.value = night; INKU.uFogD.value = scene.fog.density;
+  _ikR.setFromMatrixColumn(camera.matrixWorld, 0); _ikR.y = 0; if (_ikR.lengthSq() < 1e-6) _ikR.set(1, 0, 0); _ikR.normalize();
+  if (live && !calm && !INK.list.length && P.idle < 25) inkDirector(dt, night);
+  updateWraiths(dt, calm, night); updateShots(dt); updateBlots(dt); updateInkParts(dt); updateStains(dt);
+  AIM.k = lerp(AIM.k, (AIM.held || STILL.on || STILL.volley.length > 0 || INK.shots.some(s => s.home)) && live && HP.down <= 0 && !cardOpen ? 1 : 0, Math.min(1, rdt * 9));
+  if (AIM.k < 0.5 && camS.pitch < -0.05) camS.pitch = lerp(camS.pitch, -0.05, Math.min(1, rdt * 4));
+  INK.cd = Math.max(0, INK.cd - dt); INK.thrT = Math.max(0, INK.thrT - dt); INK.snapT = Math.max(0, INK.snapT - dt); INK.snapW = lerp(INK.snapW, INK.snapT > 0 ? 1 : 0, Math.min(1, rdt * 25));
+  if (INK.reloadT > 0) { INK.reloadT -= dt; if (INK.reloadT <= 0) { INK.reloadT = 0; INK.hod = HOD; sfxReload(); } }
+  INK.quietT += dt; if (INK.quietT > 4 && INK.hod < HOD && INK.reloadT <= 0) INK.hod = HOD;   // topped up out of the fight
+  HP.inv = Math.max(0, HP.inv - dt); HP.pulse = Math.max(0, HP.pulse - rdt * 1.6); HP.flinch = Math.max(0, HP.flinch - dt * 3);
+  HP.regenT -= dt; if (HP.regenT <= 0 && HP.v < 1 && HP.down <= 0) HP.v = Math.min(1, HP.v + dt * (INK.alert ? 0.04 : 0.12));
+  CRACKU.value = smooth(clamp((1 - HP.v) * 1.15, 0, 1));
+  if (HP.down > 0) { HP.down -= rdt; if (HP.down <= 1.6 && !HP.recast) { HP.recast = true; recast(); } if (HP.down <= 0) HP.down = 0; }
+  updateStill(dt, rdt);
+  INK.alert = INK.list.some(w => inkHittable(w) && Math.hypot(w.x - P.x, w.z - P.z) < 60);
+  INK.fight = lerp(INK.fight, INK.alert ? 1 : 0, Math.min(1, rdt * (INK.alert ? 2 : 0.3)));
+  if (INK.list.length) INK.inFight = true;
+  else if (INK.inFight) {
+    INK.inFight = false;
+    if (!INK.quietEnd) {
+      const first = !INK.seen && INK.waveKills > 0; if (INK.waveKills > 0) INK.seen = true;
+      toast(first ? `Whitewashed. Next time, ${isTouch() ? 'Whistle' : 'Space'} sends the dogs at the ink.` : INK.waveKills >= INK.wave ? `The plain is clean again. ${INK.kills} wraiths whitewashed.`
+        : INK.waveKills ? 'The rest of the ink sinks back into the plain.' : 'The ink sinks back into the plain.', 3.6);
+    }
+    INK.quietEnd = false;
+  }
+  if (INK.tipT > 0 && INK.list.length) { INK.tipT -= rdt; if (INK.tipT <= 0) toast(isTouch() ? 'Tap Still to stop time and mark the ink, then tap again to let fly.' : 'Press Q for Still Life: time nearly stops while you mark the ink.', 5); }
+}
+// ---- after the camera moves: turn the cards to face it, pools under the wraiths, the cores, the sights and the chalk marks
+const coreEl = { box: $('cores'), pl: $('cPlaster'), plv: $('cPlaster').querySelector('.val'), stv: $('cStill').querySelector('.val'), dots: Array.from($('cHod').querySelectorAll('i')), sights: $('sights'), marks: $('marks'), tThrow: $('tThrow'), tStill: $('tStill') }, coreV = {}, markEls = [];
+const setCls = (el, c, on) => { if (el.classList.contains(c) !== on) el.classList.toggle(c, on); };
+function placeInk(rdt) {
+  const cx = camera.position.x, cz = camera.position.z;
+  INK.pts.material.uniforms.uScale.value = VH * renderer.getPixelRatio() / (2 * Math.tan(camera.fov * DEG / 2));
+  for (const w of INK.list) {
+    const v = w.v, vis = (w.state !== 'rise' || w.t > 0) && w.rise > 0.005;
+    // its pool spreads first, then the figure stands up out of it
+    const pool = (1.6 + 0.9 * w.spread) * (w.state === 'rise' ? lerp(1.35, 1, w.rise) * smooth(clamp((w.t + 0.3) / 0.6, 0, 1)) : w.state === 'sink' ? w.rise : 1);
+    stainSet(w.pool, w.x, w.z, pool, 0, w.state === 'die' ? 0.85 * (1 - v.u.uDie.value) : 0.85, w.seed);
+    v.body.visible = vis;
+    if (!vis) { v.echoes.forEach(e => { e.visible = false; }); continue; }
+    const bob = Math.sin(S.t * 1.7 + w.seed * 9) * 0.06 - 0.05;
+    v.body.position.set(w.x, w.y + bob, w.z); v.body.rotation.set(0, Math.atan2(cx - w.x, cz - w.z), 0); v.body.scale.set(INK_W, INK_H * w.tall * w.rise, 1);
+    v.body.material.uniforms.uAlpha.value = w.alpha; v.u.uSpread.value = w.spread; v.u.uEye.value = w.eye; v.u.uLean.value = w.lean;
+    // the smear: where it was a moment ago, fainter, the faster it moves
+    const sm = clamp((w.sp - 1.5) / 9, 0, 1) * w.alpha;
+    v.echoes.forEach((e, k) => {
+      const a = sm * [0.4, 0.2][k]; e.visible = a > 0.01; if (!e.visible) return;
+      const sn = histAt(w.hist, S.t - [0.06, 0.12][k]); e.position.set(sn.x, sn.y + bob, sn.z); e.rotation.set(0, Math.atan2(cx - sn.x, cz - sn.z), 0); e.scale.copy(v.body.scale); e.material.uniforms.uAlpha.value = a;
+    });
+  }
+  // the cores show whenever something is spent or a fight is on, and fade out once all three are full again
+  const live = S.started && !S.paused, touch = isTouch();
+  INK.coresT = Math.max(0, INK.coresT - rdt);
+  setCls(coreEl.box, 'on', live && (INK.list.length > 0 || HP.v < 0.995 || STILL.k > 0.02 || INK.hod < HOD || INK.reloadT > 0 || INK.coresT > 0));
+  const pv = Math.round(HP.v * 100), sv = Math.round(STILL.meter * 100);
+  if (coreV.p !== pv) { coreV.p = pv; coreEl.plv.style.strokeDashoffset = 100 - pv; }
+  if (coreV.s !== sv) { coreV.s = sv; coreEl.stv.style.strokeDashoffset = 100 - sv; }
+  if (coreV.h !== INK.hod) { coreV.h = INK.hod; coreEl.dots.forEach((d, i) => setCls(d, 'spent', i >= INK.hod)); }
+  setCls(coreEl.pl, 'low', HP.v < 0.3); setCls(coreEl.box, 'reload', INK.reloadT > 0);
+  const th = !(touch && live && INK.alert), stl = !(touch && live && (INK.alert || STILL.on));
+  if (coreEl.tThrow.hidden !== th) coreEl.tThrow.hidden = th;
+  if (coreEl.tStill.hidden !== stl) coreEl.tStill.hidden = stl;
+  const aimOn = live && AIM.k > 0.5 && HP.down <= 0;
+  INK.sight = aimOn ? sightTarget() : null;
+  setCls(coreEl.sights, 'on', aimOn); setCls(coreEl.sights, 'still', STILL.on); setCls(coreEl.sights, 'hot', !!INK.sight);
+  // red chalk over every marked head, held through the volley until each throw lands
+  const list = STILL.on ? STILL.marks : STILL.volley; let n = 0;
+  for (const m of list) {
+    const w = m.w; if (!inkHittable(w)) continue;
+    _ikA.set(w.x, w.y + 2.32 * w.tall * w.rise + 0.05, w.z).project(camera);
+    if (_ikA.z > 1 || Math.abs(_ikA.x) > 1.2 || Math.abs(_ikA.y) > 1.2) continue;
+    let el = markEls[n];
+    if (!el) { el = markEls[n] = document.createElement('div'); el.className = 'mark'; el.innerHTML = '<svg viewBox="0 0 26 26"><path d="M6.5 7.2c3.6 3.1 8.4 7.6 13.3 12.1" stroke-width="3.1"/><path d="M19.4 6.4c-3.3 3.9-8 8.3-12.6 13" stroke-width="2.6"/></svg>'; coreEl.marks.appendChild(el); }
+    el.hidden = false; el.style.transform = `translate(${((_ikA.x * 0.5 + 0.5) * VW).toFixed(1)}px,${((0.5 - _ikA.y * 0.5) * VH).toFixed(1)}px)`; n++;
+  }
+  for (let i = n; i < markEls.length; i++) if (!markEls[i].hidden) markEls[i].hidden = true;
+}
+// whitewash and recast: the page goes to bare paper and comes back
+const downFade = () => HP.down <= 0 ? 0 : HP.down > 2.2 ? smooth(clamp((3.2 - HP.down) / 1.0, 0, 1)) : HP.down > 1.4 ? 1 : smooth(HP.down / 1.4);
+// ---- the ink's sounds, from the same hall as the score
+function noiseHit(f, q, dur, vol, pan = 0, hall = 0.2, delay = 0) {
+  // a short filtered burst with a hard attack: splats, thuds, chalk
+  if (!AC || muted || !SCORE_E) return;
+  const t = AC.currentTime + 0.01 + delay, s = AC.createBufferSource(), bp = AC.createBiquadFilter(), g = AC.createGain();
+  s.buffer = SCORE_E.noise; bp.type = 'bandpass'; bp.Q.value = q; bp.frequency.setValueAtTime(f, t); bp.frequency.exponentialRampToValueAtTime(f * 0.6, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(bp); bp.connect(g);
+  let out = g; if (AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); g.connect(p); out = p; }
+  out.connect(master); sendHall(out, hall); s.start(t, Math.random()); s.stop(t + dur + 0.05);
+}
+function musicDuck(on) { if (musicLP && AC) musicLP.frequency.setTargetAtTime(on ? 520 : 20000, AC.currentTime, on ? 0.12 : 0.35); }
+function sfxInkRise() {
+  if (!SCORE_E || !AC || muted) return;
+  // after the opening of Mahler's Second: tremolo above, then the cellos and basses tear upward in a run and land on an accent
+  SCORE_E.event('fight'); const t = AC.currentTime + 0.08;
+  [43, 47, 48, 50, 51, 53, 55].forEach((m, i) => { const last = i === 6; bowString(SCORE_E, { t: t + 0.18 + i * 0.062, f: mtof(m), vel: 0.8, dur: last ? 1.2 : 0.055, att: 0.02, rel: last ? 1.8 : 0.22, pan: 0.32, g: 0.44, vib: last ? 8 : 0, vr: 5.4, vdel: 0.4, det: 4, trem: 0, low: true }, SCORE_E.loIn); });
+  [55, 62].forEach(m => bowString(SCORE_E, { t, f: mtof(m), vel: 0.42, dur: 1.9, att: 0.1, rel: 1.6, pan: -0.3, g: 0.22, vib: 3, vr: 5, vdel: 0.6, det: 5, trem: 13, low: false }, SCORE_E.hiIn));
+}
+function sfxThrow() { breath(420, 1500, 700, 0.22, 0.13, 1.4, 0.1, 0.08); }
+function sfxSplat(x, z, head, ground) {
+  const pan = panOf(x, z), far = ground ? clamp(1 - Math.hypot(x - P.x, z - P.z) / 70, 0.2, 1) : 1;
+  noiseHit(900, 1.1, 0.16, 0.15 * far, pan, 0.25); noiseHit(260, 0.9, 0.22, 0.11 * far, pan, 0.15);
+  const ch = SCORE_E && SCORE_E.chord; if (ch && !ground) pluck(ch[head ? 3 : 2] + (head ? 24 : 12), head ? 0.3 : 0.2, pan);
+}
+function sfxWash(x, z) {
+  // the ink's last breath, and two plucked notes of the held chord as it whitens and falls
+  const pan = panOf(x, z), ch = SCORE_E && SCORE_E.chord;
+  breath(700, 420, 260, 1.4, 0.07, 4, pan, 0.6); noiseHit(1800, 0.7, 0.5, 0.05, pan, 0.4, 0.75);
+  if (ch) { pluck(ch[1] + 12, 0.3, pan, 0.05); pluck(ch[3] + 24, 0.16, pan, 0.18); }
+}
+function sfxWindup(x, z) { const pan = panOf(x, z); breath(160, 420, 900, 0.75, 0.12, 1.8, pan, 0.4); tone('sawtooth', 110, 165, 0.75, 0.03, { lp: 700, pan, att: 0.3 }); }
+function sfxLunge(x, z) { breath(300, 1200, 400, 0.5, 0.08, 1.2, panOf(x, z), 0.2); }
+function sfxBlot(x, z) { const pan = panOf(x, z); noiseHit(320, 1.4, 0.12, 0.1, pan, 0.2); tone('sine', 160, 70, 0.16, 0.05, { pan }); }
+function sfxBlotLand(x, z) { const d = Math.hypot(x - P.x, z - P.z); noiseHit(240, 1.2, 0.2, 0.09 * clamp(1 - d / 60, 0.15, 1), panOf(x, z), 0.2); }
+function sfxHurt() { tone('sine', 120, 50, 0.35, 0.16, { att: 0.005, lp: 600 }); noiseHit(2600, 2.5, 0.07, 0.07, 0, 0.1); noiseHit(400, 0.8, 0.25, 0.12, 0, 0.3); }
+function sfxBite(x, z) { const pan = panOf(x, z); noiseHit(1400, 2, 0.06, 0.06, pan, 0.1); noiseHit(500, 1.5, 0.1, 0.05, pan, 0.1, 0.03); }
+function sfxStillIn() { breath(260, 760, 520, 0.9, 0.12, 1.1, 0, 0.5); const ch = SCORE_E && SCORE_E.chord, f = mtof((ch ? ch[3] : 61) + 24); tone('sine', f, f, 3, 0.03, { att: 0.6, vib: 4, vibD: 3 }); }
+function sfxStillOut() { breath(700, 380, 220, 0.6, 0.07, 1.1, 0, 0.4); }
+function sfxMark(delay) { noiseHit(3200, 1.6, 0.09, 0.09, 0, 0.05, delay); noiseHit(2400, 1.2, 0.07, 0.06, 0, 0, delay + 0.05); }
+function sfxBeat() {
+  // lub-dub, pitched high enough that laptop speakers still carry it
+  tone('sine', 110, 58, 0.2, 0.16, { att: 0.004, lp: 500 }); tone('triangle', 230, 120, 0.07, 0.035, { att: 0.003, lp: 900 });
+  tone('sine', 100, 54, 0.22, 0.12, { att: 0.004, lp: 500, delay: 0.2 }); tone('triangle', 210, 110, 0.07, 0.025, { att: 0.003, lp: 900, delay: 0.2 });
+}
+function sfxReload() { noiseHit(600, 0.8, 0.3, 0.05, 0.1, 0.1); noiseHit(900, 0.8, 0.2, 0.04, 0.1, 0.1, 0.25); }
+function sfxDown() { noiseHit(1500, 0.6, 1.2, 0.1, 0, 0.6); noiseHit(300, 0.7, 0.8, 0.12, 0, 0.5); breath(400, 220, 120, 2.2, 0.08, 2, 0, 0.7, 0.2); }
+
 // ================================================================= update
 let curBiome = 0, biomeCand = 0, biomeHold = 0, biomeCheck = 0, fogT = 0, saveT = 0;
 const perf = { acc: 0, n: 0, t: 0, locked: !!store.get('gesso-quality') };
 function updatePlayer(dt) {
   let ix = 0, iz = 0, run = !!keys.run;
-  if (playing()) {
+  if (playing() && HP.down <= 0) {
     if (keys.left) ix -= 1; if (keys.right) ix += 1; if (keys.up) iz += 1; if (keys.down) iz -= 1;
     if (joy.active) { ix += joy.x; iz -= joy.y; if (Math.hypot(joy.x, joy.y) > 0.92) run = true; }
   }
   const m = Math.hypot(ix, iz); if (m > 1) { ix /= m; iz /= m; }
   let dx, dz;
-  if (camMode === 'profile' && S.cineT <= 0) { P.head -= ix * dt * (S.riding ? 1.5 : 2.6); dx = Math.sin(P.head) * iz; dz = Math.cos(P.head) * iz; }
+  const aiming = AIM.k > 0.5 && !S.riding;
+  if (camMode === 'profile' && S.cineT <= 0 && AIM.k < 0.5) { P.head -= ix * dt * (S.riding ? 1.5 : 2.6); dx = Math.sin(P.head) * iz; dz = Math.cos(P.head) * iz; }
   else { const fx = -Math.sin(camS.yaw), fz = -Math.cos(camS.yaw), rx = Math.cos(camS.yaw), rz = -Math.sin(camS.yaw); dx = fx * iz + rx * ix; dz = fz * iz + rz * ix; }
-  let maxS = S.riding ? 24 : (run ? 9.5 : 4.6); if (P.inWater) maxS *= 0.6;
+  let maxS = S.riding ? 24 : (run ? 9.5 : 4.6); if (P.inWater) maxS *= 0.6; if (aiming) maxS = Math.min(maxS, 2.8);
   const acc = Math.min(1, dt * (S.riding ? 3.5 : 9));
   P.vx += (dx * maxS - P.vx) * acc; P.vz += (dz * maxS - P.vz) * acc;
   let nx = P.x + P.vx * dt, nz = P.z + P.vz * dt;
@@ -3084,9 +3880,11 @@ function updatePlayer(dt) {
   P.x = nx; P.z = nz; P.y = heightAt(P.x, P.z);
   P.speed = Math.hypot(P.vx, P.vz);
   const prevHead = P.head;
-  if (camMode !== 'profile' && P.speed > 0.4) { const want = Math.atan2(P.vx, P.vz); let d = want - P.head; d = Math.atan2(Math.sin(d), Math.cos(d)); P.head += d * Math.min(1, dt * 10); }
+  if (aiming) { let d = (camS.yaw + Math.PI) - P.head; d = Math.atan2(Math.sin(d), Math.cos(d)); P.head += d * Math.min(1, dt * 16); }
+  else if (P.faceT > 0 && !S.riding) { P.faceT -= dt; let d = P.faceA - P.head; d = Math.atan2(Math.sin(d), Math.cos(d)); P.head += d * Math.min(1, dt * 18); }
+  else if (camMode !== 'profile' && P.speed > 0.4) { const want = Math.atan2(P.vx, P.vz); let d = want - P.head; d = Math.atan2(Math.sin(d), Math.cos(d)); P.head += d * Math.min(1, dt * 10); }
   { let dh = P.head - prevHead; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); P.turn = lerp(P.turn || 0, dh / Math.max(dt, 1e-3), Math.min(1, dt * 6)); P.roll = clamp(-P.turn * 0.04 * clamp(P.speed / 5, 0, 1.6), -0.16, 0.16); }
-  if (m > 0.1 && S.t - camS.lastDrag > 1.5 && Math.abs(iz) > Math.abs(ix) * 0.8 && iz > 0) { let d = (P.head + Math.PI) - camS.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); camS.yaw += d * Math.min(1, dt * 0.6); }
+  if (m > 0.1 && AIM.k < 0.5 && S.t - camS.lastDrag > 1.5 && Math.abs(iz) > Math.abs(ix) * 0.8 && iz > 0) { let d = (P.head + Math.PI) - camS.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); camS.yaw += d * Math.min(1, dt * 0.6); }
   P.phase += dt * P.speed * (S.riding ? 0.5 : 1.75);
   P.idle = P.speed < 0.3 ? P.idle + dt : 0;
   P.reachT = Math.max(0, P.reachT - dt);
@@ -3101,6 +3899,7 @@ function updatePlayer(dt) {
   let wy = 0, wp = 0;
   if (lt) { let a = Math.atan2(lt.x - P.x, lt.z - P.z) - P.head; a = Math.atan2(Math.sin(a), Math.cos(a)); if (Math.abs(a) < 1.9) { wy = clamp(a, -1, 1); wp = clamp(-Math.atan2(ly - (P.y + 1.75), Math.hypot(lt.x - P.x, lt.z - P.z) || 1), -0.45, 0.5); } }
   else if (P.idle > 3) wy = Math.sin(S.t * 0.35) * 0.5;
+  if (AIM.k > 0.5) { wy = 0; wp = clamp(camS.pitch * 0.6, -0.3, 0.4); }
   P.lookY = lerp(P.lookY || 0, wy, Math.min(1, dt * 3)); P.lookP = lerp(P.lookP || 0, wp, Math.min(1, dt * 3));
 }
 function updateDogs(dt) {
@@ -3120,6 +3919,19 @@ function updateDogs(dt) {
     }
     if (S.riding) { d.x = P.x; d.z = P.z; d.vx = d.vz = 0; d.state = 'follow'; continue; }
     let tx = d.x, tz = d.z, maxS = 12.5, wantSit = 0; d.howl = Math.max(0, d.howl - dt * 0.8);
+    d.knockT = Math.max(0, (d.knockT || 0) - dt);
+    if (d.state === 'fight') {
+      // sent at the ink: run it down, bite and wheel away, bite again; the bites pin it for Gesso's gesso
+      const w = d.foe;
+      d.fightT = (d.fightT || 0) - dt;
+      if (!inkHittable(w) || d.fightT <= 0) { d.foe = null; d.state = 'follow'; }   // a whistle buys about twelve seconds of harrying
+      else {
+        const dist = Math.hypot(w.x - d.x, w.z - d.z); d.biteCD = (d.biteCD || 0) - dt; maxS = 19;
+        if (d.biteCD > 0.6) { const a = Math.atan2(d.x - w.x, d.z - w.z) + 0.9 * (d.seed > 0.5 ? 1 : -1); tx = w.x + Math.sin(a) * 3.4; tz = w.z + Math.cos(a) * 3.4; maxS = 13; }
+        else { tx = w.x; tz = w.z; if (dist < 1.4 && d.biteCD <= 0) { biteWraith(d, w); d.biteCD = 1.9; } }
+        d.barkT = (d.barkT || 0) - dt; if (d.barkT <= 0) { d.barkT = 2.6 + Math.random() * 1.8; sfxYip(); }
+      }
+    }
     if (d.state === 'seek') {
       const tg = d.target; tx = tg.x; tz = tg.z; maxS = 24;
       const dist = Math.hypot(tx - d.x, tz - d.z);
@@ -3240,15 +4052,17 @@ function rebuildDynamic() {
     for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const k = ckey(i, j); let a = cGrid.get(k); if (!a) cGrid.set(k, a = []); a.push(c); let l = dynCells.get(k); if (!l) dynCells.set(k, l = []); l.push(c); }
   }
 }
-function update(dt) {
+function update(rdt) {
+  const dt = rdt * S.timeK;
   S.t += dt; U.time.value = S.t; S.cineT = Math.max(0, (S.cineT || 0) - dt);
   if (playing()) S.clock += dt;
   S.whistleCD = Math.max(0, S.whistleCD - dt);
   updatePlayer(dt);
   updateDogs(dt);
   updateWorld(dt);
+  if (INK.g) updateInk(dt, rdt);
   interactTarget = playing() ? findInteract() : null;
-  if (cardOpen) { cardTimer -= dt; if (cardTimer <= 0) hideCard(); }
+  if (cardOpen) { cardTimer -= rdt; if (cardTimer <= 0) hideCard(); }
   setPrompt(playing() && interactTarget && !cardOpen ? `<kbd>${document.body.classList.contains('touch') ? 'Act' : 'E'}</kbd> ${interactTarget.label}` : '');
   const reach = S.riding ? 2.4 : 1.4;
   for (const r of W.relics) if (!S.collected.has(r.id) && Math.abs(r.x - P.x) < 3 && Math.abs(r.z - P.z) < 3 && Math.hypot(r.x - P.x, r.z - P.z) < reach) collect(r);
@@ -3259,9 +4073,9 @@ function update(dt) {
     if (b !== biomeCand) { biomeCand = b; biomeHold = 0; } else biomeHold += 0.5;
     if (biomeCand !== curBiome && biomeHold >= 1.5) { curBiome = biomeCand; banner(BIO[curBiome].name); }
   }
-  if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').classList.remove('on'); }
-  if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) $('banner').classList.remove('on'); }
-  saveT -= dt; if (saveT <= 0) { saveT = 4; save(); }
+  if (toastT > 0) { toastT -= rdt; if (toastT <= 0) $('toast').classList.remove('on'); }
+  if (bannerT > 0) { bannerT -= rdt; if (bannerT <= 0) $('banner').classList.remove('on'); }
+  saveT -= rdt; if (saveT <= 0) { saveT = 4; save(); }
 }
 
 // ================================================================= render
@@ -3303,6 +4117,9 @@ function poseRestEcho(e, k, a) {
 function placeActors(dt) {
   const amp = clamp(P.speed / 4.6, 0, 1.35), cover = !S.started || S.paused, ride = S.riding || cover, echoOn = quality === 'high';
   const gy = Math.max(heightAt(P.x, P.z), WATER) + 0.03;
+  // the throw: aim (or a snap throw) cocks the arm; each release whips it through and back
+  const aimW = cover ? 0 : Math.max(smooth(clamp(AIM.k, 0, 1)), INK.snapW), te = 0.45 - INK.thrT, thr = INK.thrT > 0 ? (te < 0.15 ? smooth(te / 0.15) : 1 - smooth((te - 0.15) / 0.3)) : 0;
+  if (G.ball) G.ball.visible = aimW > 0.4 && INK.thrT < 0.29 && INK.hod > 0 && INK.reloadT <= 0;
   GHOSTU.uAmb.value.copy(hemi.color).multiplyScalar(hemi.intensity * 0.6).addScalar(0.06 + 0.22 * SKYV.night); GHOSTU.uGlow.value = 0.2 + 0.42 * SKYV.night; for (const m of GHOST_RIBS) m.opacity = m.userData.op0 * (1 - 0.6 * SKYV.night);
   if (ride) {
     STEED.root.visible = true; STEED.root.position.set(P.x, Math.max(P.y, WATER - 0.4), P.z); STEED.root.rotation.y = P.head;
@@ -3333,7 +4150,8 @@ function placeActors(dt) {
     STEED.root.updateMatrixWorld(true); STEED.seat.getWorldPosition(_v);
     G.root.position.set(_v.x, _v.y - HIP_Y, _v.z); G.root.rotation.set(0, P.head, (P.roll || 0) * 0.6);
     const rc = clamp(Math.min(P.cheerT || 0, 1.2 - (P.cheerT || 0)) * 4, 0, 1);
-    poseGesso(G, { ride: true, hero: cover, reach: P.reach * (1 - rc), lean: 0.08 * clamp((P.speed - 6) / 12, 0, 1), t: S.t, lookY: cover ? -0.35 : (P.lookY || 0) * 0.6, lookP: cover ? 0 : P.lookP || 0, cheer: rc });
+    let tw = (camS.yaw + Math.PI) - P.head; tw = Math.atan2(Math.sin(tw), Math.cos(tw));
+    poseGesso(G, { ride: true, hero: cover, aim: aimW, thr, flinch: HP.flinch, twist: clamp(tw, -1.3, 1.3) * smooth(clamp(AIM.k, 0, 1)), reach: P.reach * (1 - rc) * (1 - aimW), lean: 0.08 * clamp((P.speed - 6) / 12, 0, 1), t: S.t, lookY: cover ? -0.35 : (P.lookY || 0) * 0.6, lookP: cover ? 0 : P.lookP || 0, cheer: rc });
     G.root.updateMatrixWorld(true);
     pushHist(G.hist, { t: S.t, x: G.root.position.x, y: G.root.position.y, z: G.root.position.z, head: P.head, roll: G.root.rotation.z });
     G.echoes.forEach((e, k) => {
@@ -3349,7 +4167,7 @@ function placeActors(dt) {
     G.root.position.set(P.x, P.y - (P.inWater ? 0.1 : 0), P.z); G.root.rotation.set(0, P.head, P.roll || 0);
     const pet = clamp(Math.min(P.petT || 0, 1.6 - (P.petT || 0)) * 3, 0, 1);
     const cheer = clamp(Math.min(P.cheerT || 0, 1.2 - (P.cheerT || 0)) * 4, 0, 1);
-    poseGesso(G, { p: P.phase, amp, reach: P.reach * (1 - pet) * (1 - cheer), lean: P.speed > 6 ? 0.14 : 0.04, t: S.t, lookY: P.lookY || 0, lookP: P.lookP || 0, roll: 0, pet, cheer, tilt: S.cineM === 'face' && S.cineT > 0 ? 0.12 : 0 });
+    poseGesso(G, { p: P.phase, amp, aim: aimW, thr, flinch: HP.flinch, reach: P.reach * (1 - pet) * (1 - cheer) * (1 - aimW), lean: P.speed > 6 ? 0.14 : 0.04, t: S.t, lookY: P.lookY || 0, lookP: P.lookP || 0, roll: 0, pet, cheer, tilt: S.cineM === 'face' && S.cineT > 0 ? 0.12 : 0 });
     G.contact.visible = true; G.contact.position.set(P.x, gy, P.z); G.contact.material.opacity = 0.5 * (1 - SKYV.night * 0.4);
   }
   G.light.intensity = SKYV.night * 0.55;
@@ -3433,17 +4251,20 @@ function render(dt) {
   // title light: a warm studio key, little sky fill (blended so leaving the title does not pop)
   heroK = lerp(heroK, hero ? 1 : 0, dk); spreadK = lerp(spreadK, S.spread ? 1 : 0, dk);
   if (heroK > 0.001) { sun.color.lerp(STG_SUNC, heroK); sun.intensity = lerp(sun.intensity, 1.15, heroK); hemi.intensity = lerp(hemi.intensity, 0.15, heroK); }
-  placeActors(dt);
+  placeActors(dt * S.timeK);
   // camera
   const ty = (S.riding ? G.root.position.y + 1.4 : P.y + 1.45);
   _tgt.set(P.x, ty, P.z);
   camS.dist = lerp(camS.dist, camS.tdist * (S.riding ? 1.45 : 1), Math.min(1, dt * 4));
-  const cp = Math.cos(camS.pitch);
-  _cam.set(P.x + Math.sin(camS.yaw) * cp * camS.dist, ty + Math.sin(camS.pitch) * camS.dist, P.z + Math.cos(camS.yaw) * cp * camS.dist);
+  // aiming pulls the camera in over the right shoulder
+  // (a portrait phone has little width to spare, so it aims from further back and nearer the middle)
+  const ak = smooth(clamp(AIM.k, 0, 1)), tall = camera.aspect < 1, dEff = lerp(camS.dist, S.riding ? 4.6 : tall ? 4.2 : 2.6, ak), cp = Math.cos(camS.pitch);
+  _cam.set(P.x + Math.sin(camS.yaw) * cp * dEff, ty + Math.sin(camS.pitch) * dEff, P.z + Math.cos(camS.yaw) * cp * dEff);
+  if (ak > 0.001) { const sh = (S.riding ? 0.95 : tall ? 0.4 : 0.6) * ak, rx = Math.cos(camS.yaw), rz = -Math.sin(camS.yaw); _tgt.x += rx * sh; _tgt.z += rz * sh; _cam.x += rx * sh; _cam.z += rz * sh; _tgt.y += 0.18 * ak; _cam.y += 0.18 * ak; }
   G.head.getWorldPosition(_hp); G.hips.getWorldPosition(_hipsW);
   _fwdW.set(Math.sin(P.head), 0, Math.cos(P.head));
   const gx = G.root.position.x, gz = G.root.position.z;
-  let fovT = 55, phK = 0;
+  let fovT = lerp(55, tall ? 55 : 46, ak), phK = 0;
   if (hero) {
     // the painting's framing: long lens, ~22 deg behind profile, crown to seat ~66% of frame height, crown ~8% below the top edge
     const a = P.head - Math.PI / 2 - 0.26 + Math.sin(S.t * 0.08) * 0.03, sa = Math.sin(a), ca = Math.cos(a);
@@ -3468,7 +4289,7 @@ function render(dt) {
     else if (S.cineM === 'ride') { const a = P.head - Math.PI / 2 - 0.3 + el * 0.06, dist = 9, hy = G.root.position.y + 1.05; _tgt.set(gx + Math.sin(P.head) * 0.8, hy, gz + Math.cos(P.head) * 0.8); _cam.set(gx + Math.sin(a) * dist, hy + 0.35, gz + Math.cos(a) * dist); fovT = 32; }
     else { const dist = S.riding ? 5.5 : 4.0, a = P.head + S.cineA * (Math.PI / 2 + 0.5) + el * 0.07 * S.cineA, hy = G.root.position.y + (S.riding ? 1.35 : 1.3); _tgt.set(gx, hy, gz); _cam.set(gx + Math.sin(a) * dist, hy + 0.2, gz + Math.cos(a) * dist); fovT = 30; }
   }
-  const prof = !hero && !cine && camMode === 'profile' && S.started;
+  const prof = !hero && !cine && camMode === 'profile' && S.started && AIM.k < 0.5;
   if (prof) {
     const side = P.head - Math.PI / 2, dist = S.riding ? 10 : 6.5, hy = S.riding ? G.root.position.y + 1.15 : P.y + 1.3, lead = (S.riding ? 2.4 : 0.8) + P.speed * 0.08;
     _tgt.set(P.x + Math.sin(P.head) * lead, hy, P.z + Math.cos(P.head) * lead);
@@ -3478,9 +4299,11 @@ function render(dt) {
   const close = hero || cine;
   const stageOn = hero || (cine && (S.cineM === 'face' || S.cineM === 'body'));
   const gh = Math.max(heightAt(_cam.x, _cam.z), WATER) + (close ? 0.4 : 0.7); if (_cam.y < gh) _cam.y = gh;
-  const ck = Math.min(1, dt * (close ? 2.5 : prof ? 4 : 8)); camS.x = lerp(camS.x, _cam.x, ck); camS.y = lerp(camS.y, _cam.y, ck); camS.z = lerp(camS.z, _cam.z, ck);
-  _look.lerp(_tgt, Math.min(1, dt * (close ? 2.5 : prof ? 5 : 10)));
-  camera.position.set(camS.x, camS.y, camS.z); camera.lookAt(_look); camera.updateMatrixWorld();
+  const ck = Math.min(1, dt * (close ? 2.5 : prof ? 4 : lerp(8, 20, ak))); camS.x = lerp(camS.x, _cam.x, ck); camS.y = lerp(camS.y, _cam.y, ck); camS.z = lerp(camS.z, _cam.z, ck);
+  _look.lerp(_tgt, Math.min(1, dt * (close ? 2.5 : prof ? 5 : lerp(10, 24, ak))));
+  camera.position.set(camS.x, camS.y, camS.z);
+  if (camS.shake > 0) { camS.shake = Math.max(0, camS.shake - dt * 2.2); const sk = camS.shake * camS.shake * 0.14, tt = performance.now() / 1000; camera.position.x += Math.sin(tt * 53) * sk; camera.position.y += Math.sin(tt * 61 + 1) * sk; camera.position.z += Math.sin(tt * 47 + 2) * sk; }
+  camera.lookAt(_look); camera.updateMatrixWorld();
   // per-mode lens, eased; the projection is rebuilt only when it changes
   let projDirty = false;
   const dfov = fovT - camera.fov;
@@ -3489,6 +4312,7 @@ function render(dt) {
   if (stageOn) { camera.getWorldDirection(_camDir); stD = Math.max(1.2, _v.copy(_hipsW).sub(camera.position).dot(_camDir)) + 3.5; far = stD + 0.1; }
   if (camera.far !== far) { camera.far = far; projDirty = true; }
   if (projDirty) camera.updateProjectionMatrix();
+  if (INK.g) placeInk(dt);
   if (stageOn) {
     const h = 2 * Math.tan(camera.fov * DEG / 2) * stD * 1.4;
     STAGE.position.copy(camera.position).addScaledVector(_camDir, stD); STAGE.quaternion.copy(camera.quaternion); STAGE.scale.set(h * camera.aspect, h, 1); STAGE.visible = true;
@@ -3506,6 +4330,7 @@ function render(dt) {
   if (composer) {
     const fu = finalPass.uniforms;
     fu.uTime.value = S.t; fu.uExposure.value = expo; fu.uMapK.value = lerp(1, 0.4, Math.max(heroK, spreadK));
+    fu.uHurt.value = smooth(clamp((1 - HP.v) * 1.1, 0, 1)) * (1 - heroK); fu.uHurtP.value = HP.pulse * (1 - heroK); fu.uStill.value = STILL.k; fu.uFade.value = downFade();
     bloom.strength = lerp(0.3 + 0.45 * sv.night, 0.25, heroK); bloom.enabled = true;
     // isolation drive: the card already isolates the title; staged close-ups get a lighter touch so the card is not doubled
     isoK = lerp(isoK, hero ? 0 : cine ? (stageOn ? 0.4 : 1.0) : prof ? 0.75 : 0.45, dk);
@@ -3528,7 +4353,7 @@ function render(dt) {
       const k = quality === 'high' && !hero ? front * low * 1.6 : 0; shaftPass.enabled = k > 0.01; shaftPass.uniforms.uK.value = k;
       shaftPass.uniforms.uSun.value.set(_shV.x * 0.5 + 0.5, _shV.y * 0.5 + 0.5); shaftPass.uniforms.uCol.value.copy(sv.sun).lerp(_shC.setRGB(1, 0.8, 0.55), 0.4);
     }
-    if (aoPass) { aoPass.enabled = quality === 'high'; aoPass.aoMat.uniforms.uIntensity.value = stageOn ? 0 : 2.6; aoPass.cMat.uniforms.uMaskOn.value = maskOn ? 1 : 0; }
+    if (aoPass) { aoPass.lineK = 1 + STILL.k * 1.2; aoPass.enabled = quality === 'high'; aoPass.aoMat.uniforms.uIntensity.value = stageOn ? 0 : 2.6; aoPass.cMat.uniforms.uMaskOn.value = maskOn ? 1 : 0; }
     paintPass.enabled = quality === 'high'; paintPass.uniforms.uMaskOn.value = maskOn ? 1 : 0; paintPass.uniforms.uK.value = hero ? 0.55 : 1;
     if (maskOn) {
       // one world-matrix update shared by the mask passes and the composer passes
@@ -3602,6 +4427,7 @@ async function boot(data) {
   const btn = $('bStart');
   await nextFrame();
   await buildWorld(p => { btn.textContent = `Painting the plain… ${Math.round(p)}%`; });
+  buildInk();
   resetAll();
   let loaded = false;
   if (data && data.save) loaded = applySave(data.save);
@@ -3612,6 +4438,7 @@ async function boot(data) {
   _look.set(P.x, P.y + 1.4, P.z);
   curBiome = biomeCand = biomeAt(P.x, P.z); reveal(P.x, P.z);
   S.ready = true; applyQuality(); refreshEnv(); updateHud();
+  try { renderer.compile(scene, camera); } catch (e) {}   // the ink's shaders compile now, not at the first encounter
   btn.disabled = false; btn.textContent = loaded ? 'Continue' : 'Begin'; $('bNew').hidden = !loaded;
 }
 try { window.claude && window.claude.hot && window.claude.hot.snapshot && window.claude.hot.snapshot(() => ({ save: S.ready ? serialize() : null })); } catch (e) {}
