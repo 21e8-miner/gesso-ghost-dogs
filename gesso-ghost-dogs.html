@@ -855,7 +855,7 @@ function sweep(secs, N = 36, per = 5) {
 }
 function secAt(R, y) { let i = 0; while (i < R.length - 2 && R[i + 1].y < y) i++; const a = R[i], b = R[i + 1], t = clamp((y - a.y) / ((b.y - a.y) || 1), 0, 1), o = {}; for (const k of SKEYS) o[k] = lerp(a[k], b[k], t); return o; }
 function headGeo() {
-  const g = new T.SphereGeometry(1, 112, 84), p = g.attributes.position;
+  const g = new T.SphereGeometry(1, 112, 84), p = g.attributes.position, col = new Float32Array(p.count * 3);
   const BASE = [[-0.125, 0.012], [-0.112, 0.048], [-0.1, 0.07], [-0.085, 0.081], [-0.06, 0.084], [-0.03, 0.086], [0.0, 0.086], [0.03, 0.087], [0.055, 0.083], [0.078, 0.072], [0.1, 0.05], [0.12, 0.014]];
   const base = y => {
     const n = BASE.length; if (y <= BASE[0][0]) return BASE[0][1]; if (y >= BASE[n - 1][0]) return BASE[n - 1][1];
@@ -869,33 +869,39 @@ function headGeo() {
     let X = x * 0.086, Y = y * 0.122, Z = z * 0.102;
     const back = smooth(clamp(-z * 1.3 + 0.15, 0, 1)) * smooth(clamp(y * 1.4 + 0.45, 0, 1));
     Z -= back * 0.036; Y += back * 0.014 * lerp(0.3, 1, smooth(clamp(y * 2 + 0.5, 0, 1)));
-    if (Y < -0.03) X *= 1 - 0.42 * smooth(clamp((-Y - 0.03) / 0.09, 0, 1)) * (z > 0 ? 1 : 0.55);
+    if (Y < -0.03) X *= 1 - 0.3 * smooth(clamp((-Y - 0.03) / 0.09, 0, 1)) * (z > 0 ? 1 : 0.55);   // a mandible, not an alien V
     if (Y > 0.02 && z > 0) X *= 1 - 0.06 * smooth(clamp((Y - 0.02) / 0.08, 0, 1));
-    // the face as a mask: a gently curved plane carrying the profile
-    let F = base(Y) - 4.2 * X * X;
-    const tip = smooth(clamp((0.028 - Y) / 0.044, 0, 1)) * (Y > -0.017 ? 1 : smooth(clamp((Y + 0.03) / 0.013, 0, 1)));
-    const nw = lerp(0.012, 0.022, smooth(clamp((0.028 - Y) / 0.05, 0, 1)));
-    F += 0.011 * tip * Math.exp(-((X / nw) ** 2));
-    F -= 0.004 * gs(Y, 0.023, 0.006) * gs(X, 0, 0.02);
-    F += 0.0065 * gs(Y, 0.036, 0.011) * gs(X, 0, 0.05);
-    F += 0.005 * gs(Y, 0.032, 0.009) * gs(X, 0, 0.06);
+    // the face as a plaster cast of a skull: a memento mori in the painting's mannequin language
+    let F = base(Y) - 4.2 * X * X, sock = 0;
+    F += 0.006 * gs(Y, 0.034, 0.008) * gs(X, 0, 0.055);                  // brow ridge over the orbits
+    F += 0.004 * gs(Y, 0.012, 0.012) * gs(X, 0, 0.007);                  // nasal bones between them
     for (const sx of [-1, 1]) {
-      F -= 0.011 * gs(X, sx * 0.031, 0.015) * gs(Y, 0.017, 0.012);
-      F += 0.002 * gs(X, sx * 0.031, 0.009) * gs(Y, 0.016, 0.007);
-      F += 0.006 * gs(X, sx * 0.052, 0.018) * gs(Y, -0.004, 0.018);
-      F -= 0.004 * gs(X, sx * 0.022, 0.008) * gs(Y, -0.026, 0.01);
+      const ox = (X - sx * 0.031) / 0.0185, oy = (Y - 0.012) / 0.0165, rr = Math.sqrt(ox * ox + oy * oy);
+      const hole = 1 - smooth(clamp((rr - 0.55) / 0.5, 0, 1));          // a deep round orbit, 1 inside, 0 at the rim
+      F -= 0.024 * hole; F += 0.002 * gs(rr, 1.05, 0.12);                // the socket and its rim lip
+      sock = Math.max(sock, hole);
+      F += 0.006 * gs(X, sx * 0.05, 0.016) * gs(Y, -0.012, 0.014);      // cheekbone arch
+      F -= 0.006 * gs(X, sx * 0.04, 0.012) * gs(Y, -0.046, 0.014);      // the cheek hollow beneath
     }
-    F += 0.0015 * gs(Y, -0.037, 0.0055) * gs(X, 0, 0.019);
-    F -= 0.0015 * gs(Y, -0.0435, 0.0025) * gs(X, 0, 0.022);
-    F += 0.0015 * gs(Y, -0.05, 0.0055) * gs(X, 0, 0.017);
-    F -= 0.004 * gs(Y, -0.064, 0.007) * gs(X, 0, 0.02);
-    F += 0.009 * gs(Y, -0.083, 0.012) * gs(X, 0, 0.042);
+    { // nasal aperture: an inverted heart, narrow under the nasal bones and widening below
+      const hole = gs(Y, -0.027, 0.013) * gs(X, 0, lerp(0.005, 0.012, smooth(clamp((-0.018 - Y) / 0.022, 0, 1))));
+      F -= 0.015 * hole; sock = Math.max(sock, hole * 0.95);
+    }
+    F += 0.004 * gs(Y, -0.06, 0.012) * gs(X, 0, 0.03);                   // the teeth sit forward on the jaw
+    const bite = gs(Y, -0.062, 0.0022) * gs(X, 0, 0.026);
+    const gaps = Math.pow(0.5 + 0.5 * Math.cos(X / 0.009 * TAU), 3) * gs(Y, -0.062, 0.009) * gs(X, 0, 0.024);
+    F -= 0.003 * bite + 0.0018 * gaps;   // bite line and the gaps between teeth
+    sock = Math.max(sock, 0.85 * bite, 0.55 * gaps);
+    F += 0.008 * gs(Y, -0.088, 0.012) * gs(X, 0, 0.038);                 // chin
     // jaw shelf: a level underside from chin to neck, full only at the back where the neck enters
     if (Y < -0.07) { const fz = smooth(clamp((z + 0.15) / 0.6, 0, 1)); Y = Math.max(Y, lerp(-0.125, -0.09, fz)); }
     const w = smooth(clamp((z - 0.12) / 0.42, 0, 1)) * (1 - smooth(clamp((Math.abs(X) - 0.048) / 0.03, 0, 1)));
     Z = lerp(Z, Math.min(Z + 0.02, F), w);
     p.setXYZ(i, X, Y, Z);
+    // sockets and the nasal hole darken to olive with a breath of mint, as the painting shades its hollows
+    const k = clamp(sock * w * 1.15, 0, 1); col[i * 3] = lerp(1, 0.46, k); col[i * 3 + 1] = lerp(1, 0.48, k); col[i * 3 + 2] = lerp(1, 0.41, k);
   }
+  g.setAttribute('color', new T.BufferAttribute(col, 3));
   g.computeVertexNormals(); return fixSeams(g);
 }
 function plateGeo(R, y0, y1, thc, side) {
@@ -1184,6 +1190,7 @@ const GS = {
 };
 function buildGesso() {
   const skin = plasterMat(TORSO_S.map, TORSO_S.nmap), limbM = plasterMat(LIMB_S.map, LIMB_S.nmap), headM = plasterMat(HEAD_S.map, HEAD_S.nmap);
+  headM.vertexColors = true;   // the skull's sockets are shaded in the head geometry's colours
   const plateM = glossPlateMat();
   const mesh = (geo, m) => { const me = new T.Mesh(geo, m); me.castShadow = true; me.receiveShadow = true; return me; };
   const root = new T.Group(), hips = new T.Group(); hips.position.y = HIP_Y; root.add(hips);
