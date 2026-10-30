@@ -3304,8 +3304,14 @@ function syncCam() { $('bCam').textContent = `Camera: ${camMode === 'profile' ? 
 function photo() {
   if (!S.ready || !S.started) return;
   S.photos = (S.photos || 0) + 1; render(0);
-  const a = document.createElement('a'); a.href = cv.toDataURL('image/jpeg', 0.92); a.download = `gesso-plate-${String(S.photos).padStart(2, '0')}.jpg`; document.body.appendChild(a); a.click(); a.remove();
-  pageTurn(); toast(`Plate ${S.photos} saved.`, 2.2);
+  const name = `gesso-plate-${String(S.photos).padStart(2, '0')}.jpg`, url = cv.toDataURL('image/jpeg', 0.92);
+  pageTurn();
+  // in the artifact viewer the page may only offer a file through the downloads capability (the viewer confirms); elsewhere, a plain download
+  const use = window.claude && typeof window.claude.use === 'function' ? window.claude.use('downloads') : Promise.resolve(null);
+  Promise.resolve(use).then(dl => {
+    if (!dl) { const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); toast(`Plate ${S.photos} saved.`, 2.2); return; }
+    return fetch(url).then(r => r.blob()).then(blob => dl.save({ filename: name, data: blob })).then(() => toast(`Plate ${S.photos} saved.`, 2.2)).catch(e => { if (e && e.code === 'declined') S.photos--; else toast('The plate could not be saved here.', 2.5); });
+  }).catch(() => {});
 }
 $('bPhoto').addEventListener('click', e => { e.currentTarget.blur(); photo(); });
 function toggleCam() { camMode = camMode === 'profile' ? 'follow' : 'profile'; store.set('gesso-cam', camMode); syncCam(); if (camMode === 'follow') camS.yaw = P.head + Math.PI; toast(camMode === 'profile' ? 'Side camera. Steer with left and right.' : 'Follow camera.', 2.2); }
