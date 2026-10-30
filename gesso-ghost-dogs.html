@@ -2573,66 +2573,12 @@ function applySave(s) {
 function save() { if (S.started && S.ready) store.set(SAVE_KEY, JSON.stringify(serialize())); }
 
 // ================================================================= audio
-// ---- the score: physically modelled low strings (waveguide bowed string in an AudioWorklet), a generated hall, and a
-// generative chorale book after Mahler's Second (public domain): Urlicht (D-flat), the Ländler (A-flat), a C minor nocturne,
-// and the Resurrection chorale (G-flat). Low strings only: basses, cellos divisi, violas, one solo cello.
-const BOWED_SRC = `
-const SR = sampleRate, NBUF = 4096;
-class Voice {
-  constructor() { this.nb = new Float32Array(NBUF); this.bb = new Float32Array(NBUF); this.on = false; }
-  start(n) {
-    this.nb.fill(0); this.bb.fill(0); this.nw = 0; this.bw = 0; this.lp = 0; this.dc1 = 0; this.dc2 = 0; this.age = 0; this.on = true;
-    Object.assign(this, n); this.base = SR / n.f - 4; this.vph = Math.random() * 6.28; this.dph = Math.random() * 6.28;
-    const p = n.pan; this.gl = Math.cos((p + 1) * 0.7854) * n.g; this.gr = Math.sin((p + 1) * 0.7854) * n.g;
-    this.slope = 3.4 - 1.4 * n.press; this.end = n.dur + n.rel + 2.5;
-  }
-}
-class Bowed extends AudioWorkletProcessor {
-  constructor() { super(); this.vs = []; this.q = []; for (let i = 0; i < 26; i++) this.vs.push(new Voice());
-    this.port.onmessage = e => { for (const n of e.data) this.q.push(n); this.q.sort((a, b) => a.t - b.t); }; }
-  process(ins, outs) {
-    const o = outs[0], L = o[0], R = o[1] || o[0], N = L.length, t1 = currentTime + N / SR;
-    while (this.q.length && this.q[0].t <= t1) {
-      const n = this.q.shift(); let v = this.vs.find(x => !x.on);
-      if (!v) { v = this.vs.reduce((a, b) => (b.age - b.dur > a.age - a.dur ? b : a)); }
-      v.start(n);
-    }
-    for (const v of this.vs) {
-      if (!v.on) continue;
-      const nb = v.nb, bb = v.bb; let nw = v.nw, bw = v.bw, lp = v.lp, age = v.age, dc1 = v.dc1, dc2 = v.dc2;
-      const dt = 1 / SR, vd = v.vib * 0.000578, beta = 0.127236, pole = 0.55;
-      for (let i = 0; i < N; i++) {
-        // bow envelope: soft attack, breathing pressure, release; tremolo reverses the bow; pizzicato is a short hard burst
-        let e;
-        if (v.pizz) e = age < 0.01 ? 1 : 0;
-        else if (age < v.att) { const x = age / v.att; e = x * x * (3 - 2 * x); }
-        else if (age < v.dur) e = 1; else e = Math.max(0, 1 - (age - v.dur) / v.rel);
-        e *= 1 + 0.07 * Math.sin(6.283 * 0.31 * age + v.dph);
-        let bow = (0.03 + 0.2 * v.vel) * e;
-        if (v.trem > 0) { const sn = Math.sin(6.283 * v.trem * age); bow *= (sn < 0 ? -1 : 1) * (0.55 + 0.45 * Math.abs(sn)); }   // measured tremolo: the bow reverses but never stalls
-        // pitch: an onset scoop from below, then delayed vibrato
-        const vk = Math.min(1, Math.max(0, (age - v.vdel) / 0.5));
-        const fm = 1 - 0.0045 * Math.exp(-age * 14) + vd * vk * Math.sin(6.283 * v.vr * age + v.vph);
-        const len = v.base / fm, bl = len * beta, nl = len - bl;
-        let rp = bw - bl; if (rp < 0) rp += NBUF; let ri = rp | 0, rf = rp - ri; const bo = bb[ri] * (1 - rf) + bb[(ri + 1) & 4095] * rf;
-        rp = nw - nl; if (rp < 0) rp += NBUF; ri = rp | 0; rf = rp - ri; const no = nb[ri] * (1 - rf) + nb[(ri + 1) & 4095] * rf;
-        lp = 0.95 * bo * (1 - pole) + pole * lp;
-        const br = -lp, nr = -no, dv = bow - (br + nr);
-        let a = Math.abs((dv + 0.001) * v.slope) + 0.75; a = 1 / (a * a * a * a); if (a > 0.98) a = 0.98; else if (a < 0.01) a = 0.01;
-        const nv = v.pizz ? (age < 0.01 ? dv * 0.6 : 0) : dv * a;
-        nb[nw] = br + nv; bb[bw] = nr + nv; nw = (nw + 1) & 4095; bw = (bw + 1) & 4095;
-        const y = bo - dc1 + 0.995 * dc2; dc1 = bo; dc2 = y;
-        L[i] += y * v.gl; R[i] += y * v.gr; age += dt;
-      }
-      v.nw = nw; v.bw = bw; v.lp = lp; v.age = age; v.dc1 = dc1; v.dc2 = dc2; if (age > v.end) v.on = false;
-    }
-    return true;
-  }
-}
-registerProcessor('gesso-bowed', Bowed);`;
-// the chorale book: [bass, tenor, alto, soprano] MIDI per chord; each progression splits into two four-chord phrases
+// ---- the score: an ensemble of low strings built only from the browser's own audio nodes (no worklet, so no page policy can
+// silence it), a large dark hall, and a generative chorale book after Mahler's Second (public domain): Urlicht (D-flat), the
+// Ländler (A-flat), a C minor nocturne and the Resurrection chorale (G-flat). It keeps Mahler's sense of space: slow harmony,
+// long silences, thin textures, and phrases heard in der Ferne, from far away.
 const SCORE = {
-  urlicht: { key: 1, prog: [[37, 53, 56, 61], [37, 54, 58, 61], [37, 53, 56, 61], [36, 54, 56, 60], [34, 53, 58, 61], [30, 54, 58, 61], [39, 54, 58, 61], [32, 56, 60, 63], [37, 53, 56, 61]].slice(0, 8).concat([[37, 53, 56, 61]]) },
+  urlicht: { key: 1, prog: [[37, 53, 56, 61], [37, 54, 58, 61], [37, 53, 56, 61], [36, 54, 56, 60], [34, 53, 58, 61], [30, 54, 58, 61], [39, 54, 58, 61], [32, 56, 60, 63]] },
   landler: { key: 8, prog: [[32, 51, 56, 60], [32, 53, 56, 61], [31, 51, 55, 61], [32, 51, 56, 60], [29, 53, 56, 60], [37, 53, 56, 61], [39, 55, 58, 61], [32, 51, 56, 60]] },
   night: { key: 0, prog: [[36, 51, 55, 60], [36, 51, 56, 60], [36, 53, 56, 60], [35, 50, 55, 62], [36, 51, 55, 60], [37, 53, 56, 61], [31, 50, 53, 59], [36, 51, 55, 60]] },
   ride: { key: 3, prog: [[39, 55, 58, 63], [36, 55, 60, 63], [32, 56, 60, 63], [34, 53, 58, 62], [39, 55, 58, 63], [31, 55, 58, 63], [32, 53, 56, 60], [34, 50, 56, 62]] },
@@ -2640,83 +2586,104 @@ const SCORE = {
 };
 const SCALES = { 0: [0, 2, 3, 5, 7, 8, 10], 1: [1, 3, 5, 6, 8, 10, 0], 3: [3, 5, 7, 8, 10, 0, 2], 6: [6, 8, 10, 11, 1, 3, 5], 8: [8, 10, 0, 1, 3, 5, 7] };
 const MOODS = {
-  title: { s: 'urlicht', len: 3.8, dyn: 0.32, mel: 0.5 }, day: { s: 'landler', len: 2.6, dyn: 0.38, mel: 0.75 }, dusk: { s: 'urlicht', len: 3.3, dyn: 0.38, mel: 0.6 },
-  night: { s: 'night', len: 3.6, dyn: 0.4, mel: 0.35, trem: 6.5, pizz: true }, ride: { s: 'ride', len: 2.0, dyn: 0.42, mel: 0.5, trem: 3.2 },
-  plate: { s: 'urlicht', len: 3.2, dyn: 0.62, mel: 1 }, fuse: { s: 'rise', len: 3.9, dyn: 0.78, mel: 1, big: true },
+  title: { s: 'urlicht', len: 5.2, dyn: 0.3, mel: 0.6 }, day: { s: 'landler', len: 3.8, dyn: 0.32, mel: 0.7 }, dusk: { s: 'urlicht', len: 4.6, dyn: 0.32, mel: 0.6 },
+  night: { s: 'night', len: 5.0, dyn: 0.3, mel: 0.4, trem: 5.5 }, ride: { s: 'ride', len: 2.8, dyn: 0.36, mel: 0.5 },
+  plate: { s: 'urlicht', len: 4.2, dyn: 0.5, mel: 1, near: true }, fuse: { s: 'rise', len: 4.6, dyn: 0.62, mel: 1, big: true, near: true },
 };
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
-function makeHallIR(ctx, secs = 3.6) {
-  const sr = ctx.sampleRate, n = Math.floor(sr * secs), ir = ctx.createBuffer(2, n, sr), rnd = mulberry32(77);
+// a large dark hall: 45 ms pre-delay, early reflections, a 4.6 s tail whose highs die first, left and right decorrelated
+function makeHallIR(ctx, secs = 5.2) {
+  const sr = ctx.sampleRate, n = Math.floor(sr * secs), ir = ctx.createBuffer(2, n, sr), rnd = mulberry32(77), pre = Math.floor(sr * 0.045);
   for (let c = 0; c < 2; c++) {
     const d = ir.getChannelData(c); let lp = 0;
-    for (let i = 0; i < n; i++) {
-      const t = i / sr, k = 0.08 + 0.85 * Math.exp(-t * 1.6);           // the tail darkens as it decays: highs die first
-      lp += k * ((rnd() * 2 - 1) - lp); d[i] = lp * Math.exp(-6.9 * t / 3.3) * (t < 0.03 ? t / 0.03 : 1);
-    }
-    for (let j = 0; j < 11; j++) { const i = Math.floor(sr * (0.012 + 0.07 * rnd())); d[i] += (rnd() - 0.4) * 0.6 * Math.exp(-i / sr * 14); }
+    for (let i = pre; i < n; i++) { const t = (i - pre) / sr, k = 0.05 + 0.6 * Math.exp(-t * 1.3); lp += k * ((rnd() * 2 - 1) - lp); d[i] = lp * Math.exp(-6.9 * t / 4.6) * Math.min(1, t / 0.08); }
+    for (let j = 0; j < 14; j++) { const i = pre + Math.floor(sr * (0.008 + 0.09 * rnd())); d[i] += (rnd() - 0.4) * 0.5 * Math.exp(-(i - pre) / sr * 12); }
   }
   return ir;
 }
-// a body: resonance bank voicing the raw string into a cello (or a double bass when low is set)
+// a body: the resonances that voice a string into a cello (or a double bass when low is set), darker than a close microphone
 function stringBody(ctx, low) {
-  const spec = low ? [['highpass', 30, 0.7, 0], ['peaking', 62, 2, 4], ['peaking', 115, 2.2, 3], ['peaking', 250, 1.5, 1], ['lowpass', 2200, 0.6, 0]]
-    : [['highpass', 55, 0.7, 0], ['peaking', 102, 2.2, 3.5], ['peaking', 192, 3, 3], ['peaking', 290, 2.5, 2], ['peaking', 440, 2, 2.5], ['peaking', 580, 2, 1.2], ['peaking', 1050, 1.2, -2.5], ['peaking', 2600, 0.8, 2.5], ['lowpass', 5200, 0.6, 0]];
+  const spec = low ? [['highpass', 38, 0.7, 0], ['peaking', 70, 1.4, 1.5], ['peaking', 120, 1.8, 2.5], ['peaking', 260, 1.4, 1], ['lowpass', 1800, 0.6, 0]]
+    : [['highpass', 60, 0.7, 0], ['peaking', 102, 2, 2.5], ['peaking', 192, 2.6, 3], ['peaking', 290, 2.2, 2], ['peaking', 440, 1.8, 2], ['peaking', 580, 1.8, 1], ['peaking', 1050, 1.1, -2], ['peaking', 2400, 0.9, 2], ['lowpass', 5200, 0.6, 0]];
   const nodes = spec.map(([type, f, q, g]) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; b.gain.value = g; return b; });
   for (let i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]);
   return { input: nodes[0], output: nodes[nodes.length - 1] };
 }
-// the orchestra: two worklet sections (cellos+violas, basses), hall, and the chorale scheduler; works on live and offline contexts
+// the string's own spectrum: a bowed sawtooth with an uneven comb of partials (the even ones a little weaker)
+function stringWave(ctx, low) {
+  const N = 48, re = new Float32Array(N + 1), im = new Float32Array(N + 1);
+  for (let k = 1; k <= N; k++) im[k] = Math.pow(k, low ? -1.25 : -1.05) * (1 + 0.22 * Math.sin(k * 1.7)) * (k % 2 ? 1 : 0.86);
+  return ctx.createPeriodicWave(re, im);
+}
+// one bowed player: two detuned oscillators carrying that spectrum, a scoop into pitch, vibrato that blooms late, a bow-pressure
+// filter that brightens with the dynamic, a breath of rosin noise at the start, a slow attack and a long release into the hall
+function bowString(E, n, dest) {
+  const c = E.ctx, t = Math.max(n.t, c.currentTime + 0.02), end = t + n.dur + n.rel * 1.6, peak = n.g * n.vel, f = n.f;
+  const amp = c.createGain(); amp.gain.setValueAtTime(0, t); amp.gain.setTargetAtTime(peak, t, n.att / 3); amp.gain.setTargetAtTime(peak * 0.88, t + n.att, 1.5); amp.gain.setTargetAtTime(0, t + n.dur, n.rel / 3.5);
+  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.4;
+  const bright = 1100 + 3200 * n.vel * (n.low ? 0.5 : 1); lp.frequency.setValueAtTime(bright * 1.35, t); lp.frequency.setTargetAtTime(bright, t + 0.05, 0.3);
+  const pan = c.createStereoPanner ? c.createStereoPanner() : null; if (pan) { pan.pan.value = n.pan; amp.connect(pan); pan.connect(dest); } else amp.connect(dest);
+  lp.connect(amp);
+  let into = lp;
+  if (n.trem) { const tg = c.createGain(); tg.gain.value = 0.7; const lf = c.createOscillator(), lg = c.createGain(); lf.frequency.value = n.trem; lg.gain.value = 0.3; lf.connect(lg); lg.connect(tg.gain); lf.start(t); lf.stop(end); tg.connect(lp); into = tg; }
+  const vib = c.createOscillator(), vg = c.createGain(); vib.frequency.value = n.vr; vg.gain.setValueAtTime(0, t); vg.gain.setTargetAtTime(f * n.vib * 0.000578, t + n.vdel, 0.35); vib.connect(vg); vib.start(t); vib.stop(end);
+  for (const det of [-n.det, n.det]) {
+    const o = c.createOscillator(), og = c.createGain(), fd = f * Math.pow(2, det / 1200); o.setPeriodicWave(n.low ? E.waveLo : E.waveHi);
+    o.frequency.setValueAtTime(fd * 0.996, t); o.frequency.exponentialRampToValueAtTime(fd, t + 0.14); vg.connect(o.frequency);
+    og.gain.value = 0.5; o.connect(og); og.connect(into); o.start(t); o.stop(end);
+  }
+  const nz = c.createBufferSource(), bp = c.createBiquadFilter(), ng = c.createGain(); nz.buffer = E.noise; nz.loop = true; bp.type = 'bandpass'; bp.frequency.value = n.low ? 900 : 2600; bp.Q.value = 0.9;
+  ng.gain.setValueAtTime(0, t); ng.gain.linearRampToValueAtTime(peak * 0.18, t + 0.03); ng.gain.setTargetAtTime(peak * 0.025, t + 0.05, 0.12); ng.gain.setTargetAtTime(0, t + n.dur, n.rel / 4);
+  nz.connect(bp); bp.connect(ng); ng.connect(lp); nz.start(t, Math.random() * 1.5); nz.stop(end);
+}
+// the orchestra: section bodies, the hall, a far-away send, and the chorale scheduler; works on live and offline contexts
 async function buildScore(ctx, dest, o = {}) {
-  // blob: first, data: if the page's policy refuses blob modules
-  try { await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([BOWED_SRC], { type: 'application/javascript' }))); }
-  catch (e) { await ctx.audioWorklet.addModule('data:application/javascript;base64,' + btoa(BOWED_SRC)); }
-  const bus = ctx.createGain(); bus.gain.value = 0.32; bus.connect(dest);
-  const hall = ctx.createConvolver(); hall.buffer = makeHallIR(ctx); const wet = ctx.createGain(); wet.gain.value = 0.55; hall.connect(wet); wet.connect(bus);
-  const mk = low => { const n = new AudioWorkletNode(ctx, 'gesso-bowed', { numberOfInputs: 0, outputCount: 1, outputChannelCount: [2] }); const b = stringBody(ctx, low); n.connect(b.input);
-    const dry = ctx.createGain(); dry.gain.value = 0.6; b.output.connect(dry); dry.connect(bus); b.output.connect(hall); return n; };
-  const hi = mk(false), lo = mk(true);
+  const bus = ctx.createGain(); bus.gain.value = 0.45; bus.connect(dest);
+  const hall = ctx.createConvolver(); hall.buffer = makeHallIR(ctx); const wet = ctx.createGain(); wet.gain.value = 0.85; hall.connect(wet); wet.connect(bus);
+  const body = low => { const b = stringBody(ctx, low), dry = ctx.createGain(); dry.gain.value = 0.34; b.output.connect(dry); dry.connect(bus); b.output.connect(hall); return b.input; };
+  const far = ctx.createBiquadFilter(), farG = ctx.createGain(); far.type = 'lowpass'; far.frequency.value = 1100; farG.gain.value = 0.7; far.connect(farG); farG.connect(hall);   // in der Ferne: only the hall hears it
+  const noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate); { const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
   const rnd = mulberry32(o.seed || 2026);
-  const E = { ctx, bus, hi, lo, horizon: ctx.currentTime + 0.3, chord: [37, 53, 56, 61], half: 0, mood: o.mood || 'title', pending: null, players: o.players || 2, last: 64 };
-  E.queue = (node, list) => node.port.postMessage(list);
-  // one phrase = four chords of the current progression, voice-led with common tones tied, a hairpin, optional solo line, then a breath
+  const E = { ctx, bus, hiIn: body(false), loIn: body(true), far, noise, waveHi: stringWave(ctx, false), waveLo: stringWave(ctx, true),
+    horizon: ctx.currentTime + 0.4, chord: [37, 53, 56, 61], half: 0, mood: o.mood || 'title', pending: null, players: o.players || 2, last: 64 };
+  // one phrase = four chords, voice-led with common tones tied, a hairpin, a texture (full, sparse or a lone cello), maybe far away
   E.phrase = () => {
-    const m = MOODS[E.pending || E.mood]; E.pending = null; const sc = SCORE[m.s], ch = sc.prog.slice(E.half * 4, E.half * 4 + 4); E.half ^= 1;
-    const t0 = E.horizon, len = m.len * (0.95 + 0.1 * rnd()), hiL = [], loL = [];
-    const P = Math.max(1, E.players + (m.big ? 1 : 0));
-    for (let part = 0; part < 4; part++) {
+    const ev = E.pending, m = MOODS[ev || E.mood]; E.pending = null; const sc = SCORE[m.s], ch = sc.prog.slice(E.half * 4, E.half * 4 + 4); E.half ^= 1;
+    const t0 = E.horizon, len = m.len * (0.94 + 0.12 * rnd()), notes = [], roll = rnd();
+    const tex = m.big || ev ? 'full' : roll < 0.4 ? 'full' : roll < 0.75 ? 'sparse' : 'solo', farP = !m.near && rnd() < 0.3;
+    const parts = tex === 'full' ? [0, 1, 2, 3] : tex === 'sparse' ? [0, 2] : [0], P = Math.max(1, E.players + (m.big ? 1 : 0) - (tex === 'full' ? 0 : 1));
+    for (const part of parts) {
       let i = 0;
       while (i < 4) {
-        let j = i + 1; while (j < 4 && ch[j][part] === ch[i][part]) j++;   // tie repeated notes
-        const vel = m.dyn * (0.72 + 0.28 * Math.sin(Math.PI * (i + 0.5) / 4)) * (part === 3 ? 1.05 : 0.92);
+        let j = i + 1; while (j < 4 && ch[j][part] === ch[i][part]) j++;
+        const vel = m.dyn * (0.7 + 0.3 * Math.sin(Math.PI * (i + 0.5) / 4)) * (part === 0 ? 0.95 : part === 3 ? 1 : 0.9) * (tex === 'solo' ? 0.7 : 1);
         for (let p = 0; p < P; p++) {
-          const midi = part === 0 ? ch[i][0] + 12 * (p % 2) : ch[i][part], low = part === 0 && p % 2 === 0;
-          const n = { t: t0 + i * len + rnd() * 0.06, f: mtof(midi) * Math.pow(2, (rnd() - 0.5) * 9 / 1200), vel, dur: (j - i) * len + 0.25, att: 0.35 + rnd() * 0.3, rel: 1.6,
-            pan: [0.55, 0.25, -0.15, -0.4][part] + (rnd() - 0.5) * 0.3, g: [0.55, 0.36, 0.34, 0.36][part] / Math.sqrt(P), vib: 9 + rnd() * 7, vr: 5.1 + rnd() * 0.7, vdel: 0.35 + rnd() * 0.3,
-            press: 0.55 + 0.2 * rnd(), trem: m.trem && (part === 1 || part === 2) ? m.trem * (0.95 + 0.1 * rnd()) : 0, pizz: false };
-          if (m.pizz && part === 0) { n.dur = len * 0.45; n.att = 0.04; n.rel = 1.2; n.vel *= 1.2; n.g *= 1.3; }   // detached bass strokes under the tremolo
-          (low ? loL : hiL).push(n);
+          const midi = part === 0 ? ch[i][0] + 12 * (p % 2) : ch[i][part];
+          notes.push({ t: t0 + i * len + rnd() * 0.08, f: mtof(midi), vel, dur: (j - i) * len + 0.4, att: 0.5 + rnd() * 0.5, rel: 2.4, pan: [0.5, 0.22, -0.18, -0.42][part] + (rnd() - 0.5) * 0.3,
+            g: [0.34, 0.32, 0.3, 0.32][part] / Math.sqrt(P), vib: 9 + rnd() * 6, vr: 4.9 + rnd() * 0.7, vdel: 0.5 + rnd() * 0.4, det: 3 + rnd() * 3,
+            trem: m.trem && (part === 1 || part === 2) ? m.trem * (0.95 + 0.1 * rnd()) : 0, low: part === 0 && p % 2 === 0, far: farP });
         }
         i = j;
       }
     }
-    // a solo cello line in the tenor: chord tones joined by scale steps, singing over the second half of a progression
-    if (rnd() < m.mel) {
-      const scale = SCALES[sc.key]; const inScale = x => scale.includes(((x % 12) + 12) % 12);
-      let cur = E.last;
+    if (rnd() < m.mel || tex === 'solo') {
+      // the solo cello: chord tones joined by scale steps, singing in the tenor
+      const scale = SCALES[sc.key], inScale = x => scale.includes(((x % 12) + 12) % 12); let cur = E.last;
       for (let i = 0; i < 4; i++) {
         const tones = ch[i].slice(1).map(x => { while (x > 67) x -= 12; while (x < 52) x += 12; return x; });
-        const tgt = tones.reduce((a, b) => (Math.abs(b - cur) < Math.abs(a - cur) ? b : a));
-        const notes = [tgt]; if (rnd() < 0.7) { let s = tgt + (rnd() < 0.5 ? 1 : -1); while (!inScale(s)) s += s > tgt ? 1 : -1; notes.push(s); }
-        notes.forEach((mm, k) => { const d = len / notes.length; hiL.push({ t: t0 + i * len + k * d + 0.1, f: mtof(mm + 12), vel: m.dyn * 1.1, dur: d * 1.05, att: 0.22, rel: 0.9, pan: 0.15, g: 0.42, vib: 15, vr: 5.5, vdel: 0.25, press: 0.7, trem: 0, pizz: false }); });
-        cur = notes[notes.length - 1];
+        const tgt = tones.reduce((a, b) => (Math.abs(b - cur) < Math.abs(a - cur) ? b : a)), ns = [tgt];
+        if (rnd() < 0.55) { let s2 = tgt + (rnd() < 0.5 ? 1 : -1); while (!inScale(s2)) s2 += s2 > tgt ? 1 : -1; ns.push(s2); }
+        ns.forEach((mm, k) => { const d = len / ns.length; notes.push({ t: t0 + i * len + k * d + 0.15, f: mtof(mm + 12), vel: m.dyn * 1.05, dur: d * 1.08, att: 0.35, rel: 1.6, pan: 0.12, g: 0.42, vib: 14, vr: 5.3, vdel: 0.3, det: 2, trem: 0, low: false, far: farP }); });
+        cur = ns[ns.length - 1];
       }
       E.last = cur;
     }
-    E.queue(E.hi, hiL); E.queue(E.lo, loL); E.chord = ch[3];
-    E.horizon = t0 + 4 * len + (E.half === 0 ? 2.5 + rnd() * 3.5 : 0.4);   // breathe after each full progression
+    for (const n of notes) bowString(E, n, n.far ? E.far : n.low ? E.loIn : E.hiIn);
+    E.chord = ch[3];
+    E.horizon = t0 + 4 * len + (E.half === 0 ? 7 + rnd() * 9 : 1.2 + rnd() * 1.3);   // the silence after each progression is part of the music
   };
   E.tick = () => { while (E.horizon < E.ctx.currentTime + 1.5) E.phrase(); };
-  E.event = name => { E.pending = name; if (E.horizon > E.ctx.currentTime + 4) E.horizon = E.ctx.currentTime + 1.2; };
+  E.event = name => { E.pending = name; if (E.horizon > E.ctx.currentTime + 4) E.horizon = E.ctx.currentTime + 1.5; };
   return E;
 }
 let SCORE_E = null;
@@ -2745,7 +2712,7 @@ function audioInit() {
   const amb = AC.createGain(); amb.gain.value = 0.0001; amb.connect(master);
   ambF = AC.createBiquadFilter(); ambF.type = 'lowpass'; ambF.frequency.value = 700; ambF.connect(amb);
   { const comp = AC.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 2; comp.knee.value = 12; const mg = AC.createGain(); mg.gain.value = 1; comp.connect(mg); mg.connect(master);
-    if (AC.audioWorklet) buildScore(AC, comp, { players: quality === 'light' ? 1 : 2 }).then(E => { SCORE_E = E; setInterval(() => { if (!SCORE_E) return; const md = musicMood(); if (md !== SCORE_E.mood) SCORE_E.mood = md; SCORE_E.tick(); }, 120); }).catch(() => {}); }
+    buildScore(AC, comp, { players: quality === 'light' ? 1 : 2 }).then(E => { SCORE_E = E; setInterval(() => { if (!SCORE_E) return; const md = musicMood(); if (md !== SCORE_E.mood) SCORE_E.mood = md; SCORE_E.tick(); }, 120); }).catch(() => {}); }
   whooshBuf = AC.createBuffer(1, AC.sampleRate * 3, AC.sampleRate); const ch = whooshBuf.getChannelData(0); for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
   const n = AC.createBufferSource(); n.buffer = whooshBuf; n.loop = true;
   const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 380; bp.Q.value = 0.7;
