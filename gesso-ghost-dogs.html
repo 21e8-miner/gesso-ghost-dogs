@@ -2505,6 +2505,15 @@ async function buildWorld(progress) {
     g.position.set(x, at(x, z) - 0.05, z); g.rotation.y = Math.atan2(PLAYER_START.x - x, PLAYER_START.z - z); scene.add(g);
     addCol(x, z, 0.9); W.steles.push({ x, z, lm: i, g, halo });
   });
+  // the ninth stone: no numeral, no halo, at the rim, on the first dry ground along the rim from the far corner
+  [[490, -490], [-520, 455], [600, 330], [-600, -340], [0, -690]].some(([x, z]) => {
+    if (at(x, z) < WATER + 1.5) return false;
+    const g = new T.Group(); const m = mat('#b8a882', { roughness: 0.8 });
+    const body = new T.Mesh(new T.BoxGeometry(1.2, 1.7, 0.35), m); body.position.y = 0.85; body.castShadow = true; g.add(body);
+    const top = new T.Mesh(new T.CylinderGeometry(0.6, 0.6, 0.35, 28), m); top.rotation.x = Math.PI / 2; top.position.y = 1.7; top.castShadow = true; g.add(top);
+    g.position.set(x, at(x, z) - 0.05, z); g.rotation.y = Math.atan2(-x, -z); scene.add(g);
+    addCol(x, z, 0.9); W.steles.push({ x, z, lm: 8, g, halo: null, secret: true }); return true;
+  });
   progress(72); await nextFrame();
 
   // scatter
@@ -2653,6 +2662,9 @@ const LM = [
   { num: 'VII', name: 'The Spires', text: 'The rock here grows upward in thin twisted fingers. From this stone the moon sits right on the horizon, as large as it ever gets.' },
   { num: 'VIII', name: 'The Plinth', text: 'A drum of carved stone with a ship perched on top, nose to the sky. Six dogs could stand around its base at once, if you found them all.' },
 ];
+// the ninth plate is not in the book. A blank stone at the rim of the plain, past the last of the paint, that reads only by moonlight
+const LM9 = { num: 'IX', name: 'The Margin', text: 'This stone was not in the survey. Whoever painted the plain stopped here, and you have walked to the edge of what they finished. Look down at your hands: plaster, with a seam at the wrist. Someone is still holding the brush. When you stand very still, you can see the shadow of it pass.' };
+const LMx = i => i === 8 ? LM9 : LM[i];
 const DOG_DEFS = [
   { name: 'Vellum', tint: '#efe6cf' },
   { name: 'Sepia', tint: '#9a7a5c' },
@@ -2775,20 +2787,20 @@ function resetDogs() {
 function resetAll() {
   P.x = PLAYER_START.x; P.z = PLAYER_START.z; P.vx = P.vz = 0; P.head = Math.PI; camS.yaw = 0;
   S.collected.clear(); S.marked.clear(); S.plates.clear(); S.steed = false; S.riding = false; S.clock = DAY * 0.06;
-  INK.kills = 0; INK.seen = false; STILL.meter = 0.75; HP.v = 1; HP.down = 0; if (INK.g) inkClear(); INK.next = 45;
+  S.hand = false; HAND.next = 50; INK.kills = 0; INK.seen = false; STILL.meter = 0.75; HP.v = 1; HP.down = 0; if (INK.g) inkClear(); INK.next = 45;
   fog.fill(0); PAINT.a.fill(0); PAINT.at.fill(1e9); PAINT.dirty = true; resetDogs();
 }
 const SAVE_KEY = 'gesso-ghost-dogs-v2';
 function serialize() {
   return { v: 2, x: P.x, z: P.z, head: P.head, yaw: camS.yaw, clock: S.clock, seams: [...S.collected], marked: [...S.marked], plates: [...S.plates], steed: S.steed, riding: S.riding,
-    dogs: W.dogs.map(d => d.joined ? 1 : (d.marked ? 2 : 0)), fog: Array.from(fog).join(''), ink: INK.kills, inkSeen: INK.seen, still: Math.round(STILL.meter * 100) / 100 };
+    dogs: W.dogs.map(d => d.joined ? 1 : (d.marked ? 2 : 0)), fog: Array.from(fog).join(''), hand: S.hand ? 1 : 0, ink: INK.kills, inkSeen: INK.seen, still: Math.round(STILL.meter * 100) / 100 };
 }
 function applySave(s) {
   if (!s || s.v !== 2) return false;
   P.x = s.x; P.z = s.z; P.head = s.head || 0; camS.yaw = s.yaw || 0; S.clock = s.clock || 0;
   S.collected = new Set(s.seams || []); S.marked = new Set(s.marked || []); S.plates = new Set(s.plates || []);
   S.steed = !!s.steed; S.riding = !!s.riding && S.steed;
-  INK.kills = s.ink || 0; INK.seen = !!s.inkSeen; STILL.meter = s.still != null ? clamp(s.still, 0, 1) : 0.75;
+  S.hand = !!s.hand; INK.kills = s.ink || 0; INK.seen = !!s.inkSeen; STILL.meter = s.still != null ? clamp(s.still, 0, 1) : 0.75;
   resetDogs();
   (s.dogs || []).forEach((v, i) => { const d = W.dogs[i]; if (!d) return; if (v === 1) { d.joined = true; d.state = 'follow'; d.sit = 0; d.x = P.x - 1 + i * 0.4; d.z = P.z + 1.5; } else if (v === 2) d.marked = true; });
   if (typeof s.fog === 'string' && s.fog.length === fog.length) for (let i = 0; i < fog.length; i++) { fog[i] = s.fog.charCodeAt(i) === 49 ? 1 : 0; PAINT.a[i] = fog[i]; }
@@ -3044,6 +3056,12 @@ function updateHud() {
   $('tRide').hidden = !S.steed;
 }
 let toastT = 0, bannerT = 0, promptText = '';
+// what the title page admits to, once you have seen it: a ninth plate, and the survey retouched by an unseen hand
+function syncLore() {
+  const sp = document.querySelectorAll('#title .spec .eyebrow'); if (sp.length < 2) return;
+  sp[0].textContent = S.plates.has(8) ? 'A wandering game in nine plates' : 'A wandering game in eight plates';
+  sp[1].textContent = S.hand ? 'Survey No. 6 · retouched' : 'Survey No. 6';
+}
 function toast(msg, dur = 3) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); toastT = dur; }
 function banner(name, eye = 'You enter') { $('banEye').textContent = eye; $('banName').textContent = name; $('banner').classList.add('on'); bannerT = 3.6; }
 function showCard(eye, title, text, dur = 12, spread = false) {
@@ -3101,7 +3119,8 @@ function collect(r) {
   else toast(`Seam gathered · ${S.collected.size} of ${W.relics.length}`, 2);
 }
 function readPlate(i) {
-  const l = LM[i], first = !S.plates.has(i); S.plates.add(i); updateHud(); sfxPlate();
+  if (i === 8 && SKYV.night < 0.5) { toast('The stone is blank. Something was written here, but not by daylight.', 3.2); P.reachT = 1; return; }
+  const l = LMx(i), first = !S.plates.has(i); S.plates.add(i); updateHud(); sfxPlate(); if (i === 8) syncLore();
   let text = l.text; if (i === 7 && packCount() === W.dogs.length && !S.steed) text += ' The whole pack is with you now. Stand by the drum and press E.';
   showCard(`Plate ${l.num}${first ? '' : ' · read again'}`, l.name, text, 45, true); P.reachT = 1.2; cineStart(45, 'face'); S.cineA = -1;   // he faces the facing page, as in the painting
   const st = W.steles.find(s => s.lm === i); if (st) S.plateFlood = { x: st.x, z: st.z, first };   // closing the page paints the land around the plate
@@ -3128,7 +3147,7 @@ let interactTarget = null;
 function findInteract() {
   let best = null, bd = 1e9;
   const consider = (o, d, kind, label) => { if (d < bd) { bd = d; best = { o, kind, label }; } };
-  for (const s of W.steles) { const d = Math.hypot(s.x - P.x, s.z - P.z); if (d < 3.2) consider(s, d - 1, 'stele', S.plates.has(s.lm) ? `Read plate ${LM[s.lm].num} again` : `Read plate ${LM[s.lm].num}`); }
+  for (const s of W.steles) { const d = Math.hypot(s.x - P.x, s.z - P.z); if (d < 3.2) consider(s, d - 1, 'stele', s.secret && SKYV.night < 0.5 ? 'A blank stone' : S.plates.has(s.lm) ? `Read plate ${LMx(s.lm).num} again` : s.secret ? 'Read the stone' : `Read plate ${LMx(s.lm).num}`); }
   for (const d of W.dogs) { if (d.state !== 'lost') continue; const dd = Math.hypot(d.x - P.x, d.z - P.z); if (dd < 3.5) consider(d, dd - 1, 'lost', `Call ${d.name}`); }
   for (const n of W.npcs) { const dd = Math.hypot(n.x - P.x, n.z - P.z); if (dd < 3) consider(n, dd - 0.5, 'npc', `Talk to ${n.who}`); }
   if (!S.steed && packCount() === W.dogs.length && Math.hypot(SITES.plinth.x - P.x, SITES.plinth.z - P.z) < 26) consider(SITES.plinth, -5, 'plinth', 'Gather the pack around the drum');
@@ -3242,7 +3261,7 @@ document.body.classList.add('titling');   // the game opens on its title plate
 function startGame() {
   if (!S.ready) return; audioInit();
   if (!S.riding) { emit(P.x, P.y + 1.6, P.z, 50, { sp: 6, up: 3, life: 1.3, c: new T.Color(1.6, 1.5, 1.3), s: 1.2 }); W.dogs.forEach((d, i) => { if (d.joined) { d.x = P.x + Math.cos(i * 2.4) * 2.2; d.z = P.z + Math.sin(i * 2.4) * 2.2; d.vx = d.vz = 0; d.hop = 0.2; } }); }
-  const first = !S.started; S.started = true; setPaused(false); if (first) paintFlood(150); updateHud(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  const first = !S.started; S.started = true; setPaused(false); if (first) paintFlood(150); syncLore(); updateHud(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   if (first && S.plates.size === 0 && S.collected.size === 0) {
     banner('The Ochre Flats');
     setTimeout(() => toast(document.body.classList.contains('touch') ? 'Tap Whistle and your dogs will sniff out the green seams.' : 'Press Space to whistle. Your dogs will sniff out the green seams.', 5), 3800);
@@ -3937,6 +3956,44 @@ function sfxBeat() {
 function sfxReload() { noiseHit(600, 0.8, 0.3, 0.05, 0.1, 0.1); noiseHit(900, 0.8, 0.2, 0.04, 0.1, 0.1, 0.25); }
 function sfxDown() { noiseHit(1500, 0.6, 1.2, 0.1, 0, 0.6); noiseHit(300, 0.7, 0.8, 0.12, 0, 0.5); breath(400, 220, 120, 2.2, 0.08, 2, 0, 0.7, 0.2); }
 
+// ================================================================= the painter
+// The plain is still being painted. Stand still for a while in daylight and the shadow of the hand that holds the brush passes
+// over the ground, and where the bristles touch, a stroke of fresh gesso is laid across the plain and dries. It is never announced.
+const HAND = { on: false, t: 0, dur: 11, next: 50, mesh: null, x0: 0, z0: 0, dx: 0, dz: 0, strokeD: 0 };
+function buildHand() {
+  const tex = canvasTex(512, 512, (g, w, h) => {
+    g.clearRect(0, 0, w, h); g.fillStyle = 'rgba(28,22,16,1)'; g.filter = 'blur(9px)';
+    // a right hand from above, fingers closed on a long brush: palm, thumb, four fingers, the handle and the bristles
+    const cap = (x1, y1, x2, y2, r) => { g.lineCap = 'round'; g.lineWidth = r * 2; g.strokeStyle = g.fillStyle; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); };
+    g.beginPath(); g.ellipse(250, 300, 62, 78, -0.35, 0, Math.PI * 2); g.fill();
+    cap(214, 262, 150, 212, 22); cap(262, 232, 268, 160, 20); cap(292, 240, 318, 172, 19); cap(312, 262, 346, 204, 18); cap(322, 294, 352, 258, 16);
+    cap(120, 410, 420, 112, 11); g.lineWidth = 18; g.beginPath(); g.moveTo(420, 112); g.lineTo(466, 66); g.stroke();
+    g.filter = 'none';
+  });
+  const m = new T.Mesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 }));
+  m.visible = false; m.renderOrder = 2; m.scale.set(34, 1, 34); scene.add(m); HAND.mesh = m;
+}
+function updateHand(dt, rdt) {
+  if (!HAND.mesh) buildHand();
+  const m = HAND.mesh;
+  if (!HAND.on) {
+    if (!playing() || SKYV.night > 0.6 || INK.list.length || cardOpen || S.cineT > 0) return;
+    if (P.idle < 45) return;
+    HAND.next -= dt; if (HAND.next > 0) return;
+    HAND.next = S.hand ? 240 + Math.random() * 300 : 1e9; HAND.on = true; HAND.t = 0; S.hand = true; syncLore();
+    const a = Math.random() * TAU; HAND.dx = Math.cos(a); HAND.dz = Math.sin(a);
+    HAND.x0 = P.x - HAND.dx * 48 + (Math.random() - 0.5) * 10; HAND.z0 = P.z - HAND.dz * 48 + (Math.random() - 0.5) * 10; HAND.strokeD = 0;
+    m.visible = true; m.rotation.y = -a + 0.6; sfxHand();
+    return;
+  }
+  HAND.t += dt; const k = HAND.t / HAND.dur, x = HAND.x0 + HAND.dx * 96 * k, z = HAND.z0 + HAND.dz * 96 * k;
+  m.position.set(x, Math.max(heightAt(x, z), WATER) + 0.12, z);
+  m.material.opacity = 0.42 * Math.sin(Math.PI * clamp(k, 0, 1)) * (1 - 0.5 * SKYV.night);
+  // the bristles touch down mid-pass: a stroke of wet gesso the width of a brush, across whatever is there
+  if (k > 0.3 && k < 0.72) { HAND.strokeD += 96 * dt / HAND.dur; if (HAND.strokeD > 0.45) { HAND.strokeD = 0; m.updateMatrixWorld(); const tip = m.localToWorld(_ikA.set(0.41, 0, -0.37)); if (INK.g) addStain(tip.x + (Math.random() - 0.5) * 0.4, tip.z + (Math.random() - 0.5) * 0.4, 1.7 + Math.random() * 0.4, 1, 75, 0.9); } }
+  if (k >= 1) { HAND.on = false; m.visible = false; }
+}
+function sfxHand() { breath(90, 160, 70, 6, 0.09, 1.2, 0, 0.8); if (SCORE_E && AC && !muted) { const t = AC.currentTime + 0.3; for (const [mm, low, g] of [[30, true, 0.4], [42, false, 0.22]]) bowString(SCORE_E, { t, f: mtof(mm), vel: 0.4, dur: 6, att: 2.5, rel: 4, pan: 0, g, vib: 4, vr: 4.5, vdel: 1.5, det: 3, trem: 0, low }, low ? SCORE_E.loIn : SCORE_E.hiIn); } }
 // ================================================================= update
 let curBiome = 0, biomeCand = 0, biomeHold = 0, biomeCheck = 0, fogT = 0, saveT = 0;
 const perf = { acc: 0, n: 0, t: 0, locked: !!store.get('gesso-quality') };
@@ -4106,7 +4163,7 @@ function updateWorld(dt) {
     r.g.position.y = r.y + 1.3 + Math.sin(t * 2 + r.ph) * 0.18; r.m.rotation.y = t * 1.2 + r.ph;
     const mk = S.marked.has(r.id); r.halo.scale.setScalar((mk ? 4.5 : 2.6) * (1 + SKYV.night * 0.5)); r.beam.visible = mk; if (mk) r.beam.material.uniforms.uOp.value = 0.28 + SKYV.night * 0.2;
   }
-  for (const s of W.steles) { const unread = !S.plates.has(s.lm); s.halo.visible = unread; s.halo.material.opacity = 0.35 + SKYV.night * 0.4 + Math.sin(t * 2) * 0.1; }
+  for (const s of W.steles) { if (!s.halo) continue; const unread = !S.plates.has(s.lm); s.halo.visible = unread; s.halo.material.opacity = 0.35 + SKYV.night * 0.4 + Math.sin(t * 2) * 0.1; }
   // particles
   const pp = W.sparks.geometry.attributes.position, pc = W.sparks.geometry.attributes.acolor, ps = W.sparks.geometry.attributes.size;
   for (let i = W.parts.length - 1; i >= 0; i--) { const p = W.parts[i]; p.life -= dt; if (p.life <= 0) { W.parts.splice(i, 1); continue; } p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vx *= 1 - dt * 1.4; p.vz *= 1 - dt * 1.4; p.vy *= 1 - dt * 1.2; }
@@ -4146,6 +4203,7 @@ function update(rdt) {
   updateDogs(dt);
   updateWorld(dt);
   if (INK.g) updateInk(dt, rdt);
+  if (S.ready) updateHand(dt, rdt);
   interactTarget = playing() ? findInteract() : null;
   if (cardOpen) { cardTimer -= rdt; if (cardTimer <= 0) hideCard(); }
   setPrompt(playing() && interactTarget && !cardOpen ? `<kbd>${document.body.classList.contains('touch') ? 'Act' : 'E'}</kbd> ${interactTarget.label}` : '');
@@ -4489,7 +4547,8 @@ function drawMap() {
   for (let i = 1; i < 8; i++) { m.beginPath(); m.moveTo(i * size / 8, 0); m.lineTo(i * size / 8, size); m.moveTo(0, i * size / 8); m.lineTo(size, i * size / 8); m.stroke(); }
   m.textAlign = 'center'; m.textBaseline = 'middle';
   W.steles.forEach(s => {
-    const x = X(s.x), y = Y(s.z), l = LM[s.lm];
+    if (s.secret && !S.plates.has(8)) return;
+    const x = X(s.x), y = Y(s.z), l = LMx(s.lm);
     if (S.plates.has(s.lm)) { m.beginPath(); m.arc(x, y, 11, 0, TAU); m.fillStyle = '#2a251c'; m.fill(); m.fillStyle = '#f6f0df'; m.font = 'italic 11px "IM Fell English", Georgia, serif'; m.fillText(l.num, x, y + 0.5); m.fillStyle = '#2a251c'; m.font = 'italic 14px "IM Fell English", Georgia, serif'; m.fillText(l.name, clamp(x, 70, size - 70), y + 22); }
     else if (fogAt(s.x, s.z)) { m.fillStyle = 'rgba(42,37,28,.75)'; m.font = 'italic 16px "IM Fell English", Georgia, serif'; m.fillText('?', x, y); }
   });
