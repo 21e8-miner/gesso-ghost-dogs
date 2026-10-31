@@ -1,0 +1,21 @@
+{
+  "name": "GessoGhostDogs",
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "GessoWorld": {
+        "$path": "GessoWorld.server.lua"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "GessoClient": {
+          "$path": "GessoClient.client.lua"
+        }
+      }
+    }
+  }
+}

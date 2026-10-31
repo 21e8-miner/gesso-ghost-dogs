@@ -22,3 +22,7 @@ On a phone, drag the left side to walk and the right side to look; buttons appea
 three.js r128, a single file. Painterly post chain (anisotropic Kuwahara, visibility-bitmask GI with one bounce, a measured tone curve from the painting), generative string score after Mahler's Second in native WebAudio, and a world that stays an underdrawing until you walk it.
 
 `gesso-ghost-dogs.html` is the source, published as-is to the claude.ai artifact; `./pages.sh` wraps it as `index.html` for GitHub Pages. `./test.sh` builds a debug page for the headless harness.
+
+## Roblox Studio
+
+`roblox/GessoGhostDogs.rbxlx` is a Roblox place: open it in Studio (File → Open from File) and press Play. The plain, the plates, the seams, the pack and the ink are all built by `roblox/GessoWorld.server.lua` when the place starts; `roblox/GessoClient.client.lua` draws the spec plate and reads the keys (right mouse to aim, click to throw, F snaps at the nearest ink, Q is Still Life, H whistles, E reads). `roblox/build_rbxlx.py` rebuilds the place from the two scripts, and `roblox/default.project.json` serves them with Rojo. No assets are loaded, so there is no music in this version.
