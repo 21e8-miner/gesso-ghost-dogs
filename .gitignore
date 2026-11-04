@@ -2,3 +2,5 @@ test.html
 out/
 testx.html
 testold.html
+*.rbxlx.lock
+*.rbxl.lock
